@@ -67,10 +67,8 @@ class MainViewModel(private val repository: BusRepository) : ViewModel() {
                     )
                 }
             }.collect { list ->
-                // Default all to collapsed, let user decide
-                _savedStops.value = list.map { item ->
-                    item.copy(isCollapsed = true)
-                }
+                // Never auto collapse - keep user's state
+                _savedStops.value = list.map { it.copy(isCollapsed = it.isCollapsed) }
                 if (list.any { it.services.isNotEmpty() }.not() && list.isNotEmpty()) {
                     refreshAll()
                 }
@@ -186,12 +184,15 @@ class MainViewModel(private val repository: BusRepository) : ViewModel() {
         val currentList = _savedStops.value.toList()
         val sortedList = if (sortByEarliest) {
             currentList.sortedBy { stop ->
-                stop.services.firstOrNull()?.next?.durationMs ?: Long.MAX_VALUE
+                val firstService = stop.services.firstOrNull()
+                val nextInfo = firstService?.next
+                if (firstService == null || nextInfo == null) Long.MAX_VALUE
+                else if (nextInfo.durationMs < 60000) 0L
+                else nextInfo.durationMs
             }
         } else {
             currentList.sortedBy { it.busStop.code }
         }
-        // Re-fetch arrival times for accurate sorting
         _savedStops.value = sortedList.map { it.copy(isLoading = true) }
         viewModelScope.launch {
             val resultCodes = sortedList.map { it.busStop.code }
