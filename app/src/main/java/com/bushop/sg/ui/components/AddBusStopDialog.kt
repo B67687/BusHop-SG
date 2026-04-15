@@ -19,12 +19,15 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun AddBusStopDialog(
+    error: String? = null,
     onDismiss: () -> Unit,
     onConfirm: (code: String, name: String) -> Unit
 ) {
     var busCode by remember { mutableStateOf("") }
     var busName by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
+    var localError by remember { mutableStateOf<String?>(null) }
+
+    val displayError = localError ?: error
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -42,19 +45,19 @@ fun AddBusStopDialog(
                     onValueChange = { 
                         if (it.length <= 5 && it.all { c -> c.isDigit() }) {
                             busCode = it
-                            error = null
+                            localError = null
                         }
                     },
                     label = { Text("Bus Stop Code") },
                     placeholder = { Text("e.g. 83139") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    isError = error != null
+                    isError = displayError != null
                 )
-                if (error != null) {
+                if (displayError != null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = error!!,
+                        text = displayError,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -74,7 +77,7 @@ fun AddBusStopDialog(
             TextButton(
                 onClick = {
                     if (busCode.length != 5) {
-                        error = "Bus stop code must be 5 digits"
+                        localError = "Bus stop code must be 5 digits"
                     } else {
                         onConfirm(busCode, busName)
                     }

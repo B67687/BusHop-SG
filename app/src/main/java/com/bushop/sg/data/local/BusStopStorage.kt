@@ -6,6 +6,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+import com.bushop.sg.data.model.BusService
 import com.bushop.sg.data.model.BusStop
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -14,9 +17,28 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "bushop_prefs")
 
+data class BusStopWithData(
+    val code: String,
+    val name: String = "",
+    val servicesJson: String = "[]",
+    val lastUpdated: Long = 0L
+)
+
 class BusStopStorage(private val context: Context) {
 
     private val gson = Gson()
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
+    
+    private val encryptedPrefs = EncryptedSharedPreferences.create(
+        context,
+        "bushop_encrypted",
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
+    
     private val busStopsKey = stringPreferencesKey("saved_bus_stops")
 
     val savedBusStops: Flow<List<BusStop>> = context.dataStore.data.map { prefs ->
@@ -29,7 +51,8 @@ class BusStopStorage(private val context: Context) {
         }
     }
 
-    suspend fun addBusStop(stop: BusStop) {
+    suspend fun addBusStop(stop: BusStop): Result<Unit> {
+        var result = Result.success(Unit)
         context.dataStore.edit { prefs ->
             val json = prefs[busStopsKey] ?: "[]"
             val type = object : TypeToken<MutableList<BusStop>>() {}.type
@@ -39,11 +62,14 @@ class BusStopStorage(private val context: Context) {
                 mutableListOf()
             }
             
-            if (stops.none { it.code == stop.code }) {
+            if (stops.any { it.code == stop.code }) {
+                result = Result.failure(DuplicateStopException("Bus stop already exists"))
+            } else {
                 stops.add(stop)
                 prefs[busStopsKey] = gson.toJson(stops)
             }
         }
+        return result
     }
 
     suspend fun removeBusStop(code: String) {
@@ -60,4 +86,40 @@ class BusStopStorage(private val context: Context) {
             prefs[busStopsKey] = gson.toJson(stops)
         }
     }
+
+    fun getBusServicesFlow(): Flow<Map<String, List<BusService>>> {
+        return context.dataStore.data.map { prefs ->
+            val result = mutableMapOf<String, List<BusService>>()
+            prefs.asMap().forEach { (key, value) ->
+                if (key.name.startsWith("services_")) {
+                    val code = key.name.removePrefix("services_")
+                    try {
+                        val type = object : TypeToken<List<BusService>>() {}.type
+                        val services: List<BusService> = gson.fromJson(value as String, type) ?: emptyList()
+                        result[code] = services
+                    } catch (e: Exception) {
+                        result[code] = emptyList()
+                    }
+                }
+            }
+            result
+        }
+    }
+
+    suspend fun saveBusServices(code: String, services: List<BusService>) {
+        val key = stringPreferencesKey("services_$code")
+        context.dataStore.edit { prefs ->
+            prefs[key] = gson.toJson(services)
+        }
+    }
+
+    fun saveAutoRefreshInterval(seconds: Int) {
+        encryptedPrefs.edit().putInt("auto_refresh_interval", seconds).apply()
+    }
+
+    fun getAutoRefreshInterval(): Int {
+        return encryptedPrefs.getInt("auto_refresh_interval", 30)
+    }
 }
+
+class DuplicateStopException(message: String) : Exception(message)

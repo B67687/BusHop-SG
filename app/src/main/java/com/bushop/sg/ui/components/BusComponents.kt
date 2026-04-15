@@ -37,6 +37,7 @@ fun BusStopCard(
     isLoading: Boolean,
     error: String?,
     isOffline: Boolean,
+    lastUpdated: Long = 0L,
     onRefresh: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
@@ -91,6 +92,14 @@ fun BusStopCard(
                     services.forEach { service ->
                         BusServiceRow(service = service)
                         Spacer(modifier = Modifier.height(12.dp))
+                    }
+                    if (lastUpdated > 0) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Updated: ${formatLastUpdated(lastUpdated)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -224,4 +233,9 @@ fun OperatorBadge(operator: String) {
             color = Color.White
         )
     }
+}
+
+private fun formatLastUpdated(timestamp: Long): String {
+    val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+    return sdf.format(java.util.Date(timestamp))
 }
