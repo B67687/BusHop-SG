@@ -33,9 +33,9 @@ fun BusInfo.toDisplayArrival(): DisplayArrival {
     return DisplayArrival(
         eta = etaText,
         load = when (load) {
-            "SEA" -> "Seats"
-            "SDA" -> "Stand"
-            "LSD" -> "Limited"
+            "SEA" -> "Seats Available"
+            "SDA" -> "Standing Available"
+            "LSD" -> "Limited Standing"
             else -> load
         },
         isWheelchairAccessible = feature == "WAB",
