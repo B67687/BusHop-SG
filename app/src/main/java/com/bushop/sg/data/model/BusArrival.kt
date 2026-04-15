@@ -29,12 +29,13 @@ data class BusInfo(
 
 fun BusInfo.toDisplayArrival(): DisplayArrival {
     val durationMinutes = durationMs / 60000
+    val etaText = if (durationMinutes < 1) "Arr" else "$durationMinutes min"
     return DisplayArrival(
-        eta = if (durationMinutes < 1) "< 1 min" else "$durationMinutes min",
+        eta = etaText,
         load = when (load) {
-            "SEA" -> "Seats Available"
-            "SDA" -> "Standing Available"
-            "LSD" -> "Limited Standing"
+            "SEA" -> "Seats"
+            "SDA" -> "Stand"
+            "LSD" -> "Limited"
             else -> load
         },
         isWheelchairAccessible = feature == "WAB",

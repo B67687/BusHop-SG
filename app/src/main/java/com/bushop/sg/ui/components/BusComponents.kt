@@ -20,7 +20,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Accessibility
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -53,8 +55,10 @@ fun BusStopCard(
     isOffline: Boolean,
     lastUpdated: Long = 0L,
     isCollapsed: Boolean = false,
+    isPinned: Boolean = false,
     onRefresh: () -> Unit,
     onToggleCollapse: () -> Unit,
+    onTogglePin: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -101,6 +105,13 @@ fun BusStopCard(
                             text = "Loading...",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onTogglePin) {
+                        Icon(
+                            imageVector = if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                            contentDescription = if (isPinned) "Unpin" else "Pin",
+                            tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(onClick = onToggleCollapse) {
@@ -183,6 +194,11 @@ private fun CollapsedBusChip(service: BusService) {
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+        Text(
+            text = "|",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
         )
         Text(
             text = eta,
@@ -288,7 +304,12 @@ fun BusServiceRow(service: BusService) {
             service.next?.let { next ->
                 val arrival = next.toDisplayArrival()
                 Text(
-                    text = "${arrival.busType} - ${arrival.load}",
+                    text = arrival.busType,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = arrival.load,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -313,7 +334,7 @@ fun BusServiceRow(service: BusService) {
                 val arrival = next.toDisplayArrival()
                 Text(
                     text = arrival.eta,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.End

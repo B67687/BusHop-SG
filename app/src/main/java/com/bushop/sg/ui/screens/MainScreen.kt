@@ -143,8 +143,10 @@ fun MainScreen(viewModel: MainViewModel) {
                         isOffline = stopWithArrivals.isOffline,
                         lastUpdated = stopWithArrivals.lastUpdated,
                         isCollapsed = stopWithArrivals.isCollapsed,
+                        isPinned = stopWithArrivals.isPinned,
                         onRefresh = { viewModel.refreshArrivals(stopWithArrivals.busStop.code) },
                         onToggleCollapse = { viewModel.toggleCollapse(stopWithArrivals.busStop.code) },
+                        onTogglePin = { viewModel.togglePin(stopWithArrivals.busStop.code) },
                         onDelete = { deleteTarget = stopWithArrivals.busStop.code },
                         modifier = Modifier.combinedClickable(
                             onClick = { viewModel.toggleCollapse(stopWithArrivals.busStop.code) },
