@@ -26,7 +26,8 @@ data class BusStopWithArrivals(
     val error: String? = null,
     val isOffline: Boolean = false,
     val lastUpdated: Long = 0L,
-    val isCollapsed: Boolean = true
+    val isCollapsed: Boolean = true,
+    val isPinned: Boolean = false
 )
 
 class MainViewModel(private val repository: BusRepository) : ViewModel() {
@@ -66,9 +67,9 @@ class MainViewModel(private val repository: BusRepository) : ViewModel() {
                     )
                 }
             }.collect { list ->
-                _savedStops.value = list.mapIndexed { index, item ->
-                    val shouldOpen = list.size <= 2
-                    item.copy(isCollapsed = !shouldOpen)
+                // Default all to collapsed, let user decide
+                _savedStops.value = list.map { item ->
+                    item.copy(isCollapsed = true)
                 }
                 if (list.any { it.services.isNotEmpty() }.not() && list.isNotEmpty()) {
                     refreshAll()
@@ -183,12 +184,20 @@ class MainViewModel(private val repository: BusRepository) : ViewModel() {
     fun toggleSortOrder() {
         sortByEarliest = !sortByEarliest
         val currentList = _savedStops.value.toList()
-        _savedStops.value = if (sortByEarliest) {
+        val sortedList = if (sortByEarliest) {
             currentList.sortedBy { stop ->
                 stop.services.firstOrNull()?.next?.durationMs ?: Long.MAX_VALUE
             }
         } else {
             currentList.sortedBy { it.busStop.code }
+        }
+        // Re-fetch arrival times for accurate sorting
+        _savedStops.value = sortedList.map { it.copy(isLoading = true) }
+        viewModelScope.launch {
+            val resultCodes = sortedList.map { it.busStop.code }
+            resultCodes.forEach { code ->
+                refreshArrivals(code)
+            }
         }
     }
 
@@ -197,6 +206,15 @@ class MainViewModel(private val repository: BusRepository) : ViewModel() {
         if (index != -1) {
             _savedStops.value = _savedStops.value.toMutableList().apply {
                 this[index] = this[index].copy(isCollapsed = !this[index].isCollapsed)
+            }
+        }
+    }
+
+    fun togglePin(code: String) {
+        val index = _savedStops.value.indexOfFirst { it.busStop.code == code }
+        if (index != -1) {
+            _savedStops.value = _savedStops.value.toMutableList().apply {
+                this[index] = this[index].copy(isPinned = !this[index].isPinned)
             }
         }
     }
