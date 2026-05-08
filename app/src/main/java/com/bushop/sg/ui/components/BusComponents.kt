@@ -2,7 +2,6 @@ package com.bushop.sg.ui.components
 
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -15,6 +14,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.filled.Accessibility
 import androidx.compose.material.icons.filled.Chair
 import androidx.compose.material.icons.filled.DirectionsBus
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Warning
 
 import androidx.compose.foundation.layout.Arrangement
@@ -88,27 +88,12 @@ fun BusStopCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
-        var isHeaderPressed by remember { mutableStateOf(false) }
-        val headerBg by animateColorAsState(
-            targetValue = if (isHeaderPressed)
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
-            else
-                MaterialTheme.colorScheme.surface,
-            animationSpec = tween(100)
-        )
-
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(headerBg)
                     .pointerInput(onToggleCollapse, onDelete) {
                         detectTapGestures(
-                            onPress = {
-                                isHeaderPressed = true
-                                tryAwaitRelease()
-                                isHeaderPressed = false
-                            },
                             onTap = { onToggleCollapse() },
                             onLongPress = { onDelete() }
                         )
@@ -385,8 +370,8 @@ fun BusServiceRow(service: BusService) {
                 val arrival = next.toDisplayArrival()
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(
-                        imageVector = if (arrival.busType.contains("Double"))
-                            Icons.Default.Chair
+                            imageVector = if (arrival.busType.contains("Double"))
+                            Icons.Default.Layers
                         else
                             Icons.Default.DirectionsBus,
                         contentDescription = null,
