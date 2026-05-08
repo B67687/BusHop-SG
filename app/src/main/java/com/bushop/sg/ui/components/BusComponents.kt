@@ -228,16 +228,23 @@ private fun CollapsedBusChip(service: BusService) {
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.primaryContainer)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Text(
-            text = service.serviceNo,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
-        )
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = service.serviceNo,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(4.dp))
@@ -329,6 +336,7 @@ fun BusServiceRow(service: BusService) {
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
+            Spacer(modifier = Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OperatorBadge(operator = service.operator)
                 if (service.next?.feature == "WAB") {
@@ -381,7 +389,7 @@ fun BusServiceRow(service: BusService) {
                 val arrival = next.toDisplayArrival()
                 Box(
                     modifier = Modifier
-                        .widthIn(min = 64.dp)
+                        .widthIn(min = 80.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.primaryContainer)
                         .padding(horizontal = 12.dp, vertical = 2.dp)
@@ -394,7 +402,6 @@ fun BusServiceRow(service: BusService) {
                         textAlign = TextAlign.Center
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
             }
             service.subsequent?.let { subsequent ->
                 val arrival2 = subsequent.toDisplayArrival()
