@@ -2,6 +2,7 @@ package com.bushop.sg.ui.components
 
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -9,11 +10,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.expandVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material.icons.filled.Accessibility
+import androidx.compose.material.icons.filled.Chair
 import androidx.compose.material.icons.filled.DirectionsBus
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.Warning
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,10 +58,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
 import com.bushop.sg.data.model.BusService
 import com.bushop.sg.data.model.toDisplayArrival
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun BusStopCard(
     busStopCode: String,
@@ -84,14 +88,31 @@ fun BusStopCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
+        var isHeaderPressed by remember { mutableStateOf(false) }
+        val headerBg by animateColorAsState(
+            targetValue = if (isHeaderPressed)
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+            else
+                MaterialTheme.colorScheme.surface,
+            animationSpec = tween(100)
+        )
+
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .combinedClickable(
-                        onClick = onToggleCollapse,
-                        onLongClick = onDelete
-                    )
+                    .background(headerBg)
+                    .pointerInput(onToggleCollapse, onDelete) {
+                        detectTapGestures(
+                            onPress = {
+                                isHeaderPressed = true
+                                tryAwaitRelease()
+                                isHeaderPressed = false
+                            },
+                            onTap = { onToggleCollapse() },
+                            onLongPress = { onDelete() }
+                        )
+                    }
                     .padding(top = 12.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -234,39 +255,32 @@ private fun CollapsedBusChip(service: BusService) {
     val arrival = service.next?.toDisplayArrival()
     val eta = arrival?.eta ?: "--"
 
-    Row(
+    Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .padding(horizontal = 4.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
     ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = service.serviceNo,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
-        }
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .background(MaterialTheme.colorScheme.primary)
-                .padding(horizontal = 6.dp, vertical = 4.dp)
-        ) {
-            Text(
-                text = eta,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary
-            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.primary)
+                    .padding(horizontal = 8.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    text = eta,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            }
         }
     }
 }
@@ -371,7 +385,10 @@ fun BusServiceRow(service: BusService) {
                 val arrival = next.toDisplayArrival()
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(
-                        imageVector = Icons.Default.DirectionsBus,
+                        imageVector = if (arrival.busType.contains("Double"))
+                            Icons.Default.Chair
+                        else
+                            Icons.Default.DirectionsBus,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -384,12 +401,16 @@ fun BusServiceRow(service: BusService) {
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(
-                        imageVector = Icons.Default.CheckCircle,
+                        imageVector = when {
+                            arrival.load.contains("Seats") -> Icons.Default.Chair
+                            arrival.load.contains("Standing") -> Icons.Default.Accessibility
+                            else -> Icons.Default.Warning
+                        },
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
                         tint = when {
                             arrival.load.contains("Limited") -> Color(0xFFFF9800)
-                            else -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
                     )
                     Text(

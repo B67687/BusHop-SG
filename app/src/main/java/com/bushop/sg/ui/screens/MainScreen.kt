@@ -158,9 +158,9 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.85f),
+                    containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background
+                    scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
                 )
             )
         },
