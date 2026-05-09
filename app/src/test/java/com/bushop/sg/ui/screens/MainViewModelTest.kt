@@ -8,6 +8,7 @@ import com.bushop.sg.domain.model.BusService
 import com.bushop.sg.domain.model.BusStop
 import com.bushop.sg.domain.model.DuplicateStopException
 import com.bushop.sg.domain.model.NetworkResult
+import com.bushop.sg.domain.model.ThemeMode
 import com.bushop.sg.domain.repository.BusRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -42,9 +43,9 @@ class MainViewModelTest {
 
     private val savedStopsFlow = MutableStateFlow<List<BusStop>>(emptyList())
     private val cachedServicesFlow = MutableStateFlow<Map<String, List<BusService>>>(emptyMap())
-    private val collapsedStopsFlow = MutableStateFlow<List<String>>(emptyList())
-    private val themeModeFlow = MutableStateFlow(0)
+    private val collapsedStopsSetFlow = MutableStateFlow<Set<String>>(emptySet())
     private val cachedTimestampsFlow = MutableStateFlow<Map<String, Long>>(emptyMap())
+    private val pinnedServicesStateFlow = MutableStateFlow<Set<String>>(emptySet())
 
     @Before
     fun setUp() {
@@ -54,19 +55,16 @@ class MainViewModelTest {
             every { savedBusStops } returns savedStopsFlow
             every { cachedBusServices } returns cachedServicesFlow
             every { cachedTimestamps } returns cachedTimestampsFlow
-            every { collapsedStopCodes } returns collapsedStopsFlow
-            every { themeMode } returns themeModeFlow
+            every { collapsedStopsFlow } returns collapsedStopsSetFlow
+            every { pinnedServicesFlow } returns pinnedServicesStateFlow
             coEvery { getAutoRefreshIntervalOnce() } returns 0
             coEvery { addBusStop(any()) } returns Result.success(Unit)
             coEvery { removeBusStop(any()) } returns Unit
             coEvery { getBusArrivals(any()) } returns NetworkResult.Success(emptyList())
-            // Persistence mocks that actually update the flows
-            coEvery { setCollapsedStops(any()) } answers {
-                collapsedStopsFlow.value = firstArg()
+            coEvery { setCollapsedStops(any<Set<String>>()) } answers {
+                collapsedStopsSetFlow.value = firstArg()
             }
-            coEvery { setThemeMode(any()) } answers {
-                themeModeFlow.value = firstArg()
-            }
+            coEvery { setThemeMode(any<ThemeMode>()) } answers { }
         }
 
         busStopIndex = mockk(relaxed = true) {
@@ -214,6 +212,64 @@ class MainViewModelTest {
         val codes = viewModel.savedStops.value.map { it.busStop.code }
         assertEquals("Pinned stops should be at top", setOf("11111", "33333"), codes.take(2).toSet())
         assertEquals("Unpinned stop should be last", "22222", codes.last())
+    }
+
+    // ── Per-service pinning ──
+
+    @Test
+    fun `togglePinService adds and removes pin key`() = runTest(testDispatcher) {
+        assertFalse("Service should not be pinned initially",
+            viewModel.isServicePinned("12345", "167"))
+
+        viewModel.togglePinService("12345", "167")
+        advanceUntilIdle()
+        assertTrue("Service should be pinned after toggle",
+            viewModel.isServicePinned("12345", "167"))
+
+        viewModel.togglePinService("12345", "167")
+        advanceUntilIdle()
+        assertFalse("Service should be unpinned after second toggle",
+            viewModel.isServicePinned("12345", "167"))
+    }
+
+    @Test
+    fun `togglePinService persists to repository`() = runTest(testDispatcher) {
+        viewModel.togglePinService("12345", "167")
+        advanceUntilIdle()
+        coVerify { repository.savePinnedServices(any()) }
+    }
+
+    @Test
+    fun `isServicePinned is per-stop`() = runTest(testDispatcher) {
+        viewModel.togglePinService("11111", "167")
+        advanceUntilIdle()
+
+        assertTrue("Service should be pinned at stop 11111",
+            viewModel.isServicePinned("11111", "167"))
+        assertFalse("Same service at different stop should NOT be pinned",
+            viewModel.isServicePinned("22222", "167"))
+    }
+
+    @Test
+    fun `pinned service sorts first within stop`() = runTest(testDispatcher) {
+        val bus15 = BusService("15", "GAS",
+            next = BusInfo("", 60_000, null, null, "SEA", null, "SD", 0, null, null),
+            subsequent = null, next3 = null)
+        val bus167 = BusService("167", "SBST",
+            next = BusInfo("", 300_000, null, null, "SEA", null, "SD", 0, null, null),
+            subsequent = null, next3 = null)
+        val bus151 = BusService("151", "SBST", next = null, subsequent = null, next3 = null)
+
+        savedStopsFlow.value = listOf(BusStop("12345"))
+        cachedServicesFlow.value = mapOf("12345" to listOf(bus15, bus167, bus151))
+        advanceUntilIdle()
+
+        // Pin the middle service (by ETA: 15(60s) < 167(300s) < 151(null))
+        viewModel.togglePinService("12345", "151")
+        advanceUntilIdle()
+
+        val services = viewModel.savedStops.value.first().services
+        assertEquals("Pinned service 151 should be first", "151", services.first().serviceNo)
     }
 
     @Test
@@ -429,25 +485,25 @@ class MainViewModelTest {
     // ── Theme ──
 
     @Test
-    fun `toggleThemeMode cycles through 0, 1, 2, and back to 0`() {
-        assertEquals(0, viewModel.themeMode)
+    fun `toggleThemeMode cycles through SYSTEM, LIGHT, DARK, and back to SYSTEM`() {
+        assertEquals(ThemeMode.SYSTEM, viewModel.themeModeFlow.value)
 
         viewModel.toggleThemeMode()
-        assertEquals(1, viewModel.themeMode)
+        assertEquals(ThemeMode.LIGHT, viewModel.themeModeFlow.value)
 
         viewModel.toggleThemeMode()
-        assertEquals(2, viewModel.themeMode)
+        assertEquals(ThemeMode.DARK, viewModel.themeModeFlow.value)
 
         viewModel.toggleThemeMode()
-        assertEquals(0, viewModel.themeMode)
+        assertEquals(ThemeMode.SYSTEM, viewModel.themeModeFlow.value)
     }
 
     @Test
     fun `toggleThemeMode persists via repository`() = runTest(testDispatcher) {
         viewModel.toggleThemeMode()
-        // After advancing dispatcher, the save coroutine should have run
         runCurrent()
-        assertEquals(1, themeModeFlow.value)
+        // themeModeFlow stores as ThemeMode, convert to check persistence
+        coVerify { repository.setThemeMode(ThemeMode.LIGHT) }
     }
 
     // ── Auto-refresh interval ──

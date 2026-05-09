@@ -4,6 +4,9 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
 data class BusStopEntry(
@@ -20,6 +23,9 @@ class BusStopIndex(private val context: Context) {
     private var stops: Map<String, BusStopEntry> = emptyMap()
     @Volatile
     private var stopsByName: Map<String, List<BusStopEntry>> = emptyMap()
+
+    private val _isReady = MutableStateFlow(false)
+    val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
 
     init { /* empty — parsing is done in load() */ }
 
@@ -49,6 +55,7 @@ class BusStopIndex(private val context: Context) {
             stops = parsed.associateBy { it.code }
             stopsByName = parsed.groupBy { it.name.lowercase() }
         }
+        _isReady.value = true
     }
 
     /** Returns empty results if index hasn't loaded yet. */

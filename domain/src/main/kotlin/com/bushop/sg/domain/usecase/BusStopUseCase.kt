@@ -17,6 +17,16 @@ class BusStopUseCase {
         }
     }
 
+    fun sortServicesWithPins(
+        services: List<BusService>,
+        pinnedServiceNos: Set<String>,
+        sortByEarliest: Boolean
+    ): List<BusService> {
+        val (pinned, unpinned) = services.partition { it.serviceNo in pinnedServiceNos }
+        val sortedUnpinned = sortServices(unpinned, sortByEarliest)
+        return pinned + sortedUnpinned
+    }
+
     fun applyPinning(
         stops: List<BusStopWithArrivals>,
         wasPinned: Boolean,
