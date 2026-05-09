@@ -71,6 +71,8 @@ fun BusStopCard(
     onToggleCollapse: () -> Unit,
     onTogglePin: () -> Unit,
     onDelete: () -> Unit,
+    onTogglePinService: (serviceNo: String) -> Unit = {},
+    pinnedServiceNos: Set<String> = emptySet(),
     modifier: Modifier = Modifier
 ) {
     val busStopCode = stop.busStop.code
@@ -225,7 +227,11 @@ fun BusStopCard(
                         }
                         else -> {
                             services.forEach { service ->
-                                BusServiceRow(service = service)
+                                BusServiceRow(
+                                    service = service,
+                                    isPinned = service.serviceNo in pinnedServiceNos,
+                                    onTogglePinService = { onTogglePinService(service.serviceNo) }
+                                )
                                 Spacer(modifier = Modifier.height(12.dp))
                             }
                         }
@@ -317,7 +323,7 @@ private fun ErrorBanner(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-fun BusServiceRow(service: BusService) {
+fun BusServiceRow(service: BusService, isPinned: Boolean = false, onTogglePinService: (() -> Unit)? = null) {
     var showWabInfo by remember { mutableStateOf(false) }
 
     Row(
@@ -342,6 +348,20 @@ fun BusServiceRow(service: BusService) {
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimary
             )
+        }
+
+        if (onTogglePinService != null) {
+            IconButton(
+                onClick = onTogglePinService,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                    contentDescription = if (isPinned) "Unpin service" else "Pin service",
+                    modifier = Modifier.size(18.dp),
+                    tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -455,6 +475,17 @@ fun BusServiceRow(service: BusService) {
                     text = arrival3.eta,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End
+                )
+            }
+            if (service.next == null && service.subsequent == null && service.next3 == null) {
+                val now = java.util.Calendar.getInstance()
+                val hour = now.get(java.util.Calendar.HOUR_OF_DAY)
+                val isLateNight = hour >= 23 || hour < 6
+                Text(
+                    text = if (isLateNight) "Last bus may have departed" else "No upcoming bus",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isLateNight) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.End
                 )
             }

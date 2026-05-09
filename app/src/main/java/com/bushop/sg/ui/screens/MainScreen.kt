@@ -31,11 +31,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -57,12 +59,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bushop.sg.data.local.BusStopEntry
+import com.bushop.sg.domain.model.ThemeMode
 import com.bushop.sg.ui.components.AddBusStopDialog
 import com.bushop.sg.ui.components.BusStopCard
 
@@ -150,6 +155,9 @@ fun MainScreen(viewModel: MainViewModel) {
     val savedStops by viewModel.savedStops.collectAsState()
     val sortByEarliest by viewModel.sortByEarliest.collectAsState()
     val apiStatus by viewModel.apiStatus.collectAsState()
+    val pinnedServices by viewModel.pinnedServices.collectAsState()
+    val themeMode by viewModel.themeModeFlow.collectAsState()
+    val isIndexReady by viewModel.isIndexReady.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -201,23 +209,20 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                     IconButton(onClick = onThemeClick) {
                         Icon(
-                            imageVector = when (viewModel.themeMode) {
-                                0 -> Icons.Default.BrightnessAuto
-                                1 -> Icons.Default.LightMode
-                                2 -> Icons.Default.DarkMode
-                                else -> Icons.Default.BrightnessAuto
+                            imageVector = when (themeMode) {
+                                ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
+                                ThemeMode.LIGHT -> Icons.Default.LightMode
+                                ThemeMode.DARK -> Icons.Default.DarkMode
                             },
-                            contentDescription = when (viewModel.themeMode) {
-                                0 -> "Auto theme"
-                                1 -> "Light mode"
-                                2 -> "Dark mode"
-                                else -> "Auto theme"
+                            contentDescription = when (themeMode) {
+                                ThemeMode.SYSTEM -> "Auto theme"
+                                ThemeMode.LIGHT -> "Light mode"
+                                ThemeMode.DARK -> "Dark mode"
                             },
-                            tint = when (viewModel.themeMode) {
-                                0 -> MaterialTheme.colorScheme.onSurfaceVariant
-                                1 -> MaterialTheme.colorScheme.onSurfaceVariant
-                                2 -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = when (themeMode) {
+                                ThemeMode.SYSTEM -> MaterialTheme.colorScheme.onSurfaceVariant
+                                ThemeMode.LIGHT -> MaterialTheme.colorScheme.onSurfaceVariant
+                                ThemeMode.DARK -> MaterialTheme.colorScheme.primary
                             }
                         )
                     }
@@ -262,7 +267,22 @@ fun MainScreen(viewModel: MainViewModel) {
                     onDismiss = { viewModel.dismissApiBanner() }
                 )
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    if (savedStops.isEmpty()) {
+                    if (!isIndexReady) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Loading stops…",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else if (savedStops.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
@@ -293,7 +313,13 @@ fun MainScreen(viewModel: MainViewModel) {
                         onTogglePin = { viewModel.togglePin(stopWithArrivals.busStop.code) },
                         onDelete = {
                             deleteTarget = stopWithArrivals.busStop.code
-                        }
+                        },
+                        onTogglePinService = { serviceNo ->
+                            viewModel.togglePinService(stopWithArrivals.busStop.code, serviceNo)
+                        },
+                        pinnedServiceNos = pinnedServices
+                            .filter { it.startsWith("${stopWithArrivals.busStop.code}:") }
+                            .map { it.substringAfter(":") }.toSet()
                     )
                     }
                 }
@@ -332,35 +358,15 @@ fun MainScreen(viewModel: MainViewModel) {
         }  // close Scaffold content
 
     if (showSettings) {
-        AlertDialog(
-            onDismissRequest = { showSettings = false },
-            title = { Text("Auto Refresh") },
-            text = {
-                Column {
-                    val intervals = listOf(0 to "Off", 30 to "30s", 60 to "1m", 120 to "2m", 300 to "5m")
-                    intervals.forEach { (seconds, label) ->
-                        TextButton(
-                            onClick = {
-                                viewModel.setAutoRefreshInterval(seconds)
-                                showSettings = false
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(label, modifier = Modifier.weight(1f))
-                            if (viewModel.autoRefreshIntervalSeconds == seconds) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
-                }
+        SettingsSheet(
+            currentTheme = themeMode,
+            currentInterval = viewModel.autoRefreshIntervalSeconds,
+            onThemeChange = { viewModel.setThemeMode(it) },
+            onIntervalChange = { seconds ->
+                viewModel.setAutoRefreshInterval(seconds)
+                showSettings = false
             },
-            confirmButton = {
-                TextButton(onClick = { showSettings = false }) { Text("Done") }
-            }
+            onDismiss = { showSettings = false }
         )
     }
 
@@ -424,4 +430,51 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         )
     }
+}
+
+@Composable
+private fun SettingsSheet(
+    currentTheme: ThemeMode,
+    currentInterval: Int,
+    onThemeChange: (ThemeMode) -> Unit,
+    onIntervalChange: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Settings", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
+        text = {
+            Column {
+                Text("Theme", style = MaterialTheme.typography.titleSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(4.dp))
+                ThemeMode.entries.forEach { mode ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().clickable { onThemeChange(mode) }
+                    ) {
+                        RadioButton(selected = currentTheme == mode, onClick = { onThemeChange(mode) })
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = when (mode) { ThemeMode.SYSTEM -> "System"; ThemeMode.LIGHT -> "Light"; ThemeMode.DARK -> "Dark" })
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Auto Refresh", style = MaterialTheme.typography.titleSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(4.dp))
+                val intervals = listOf(0 to "Off", 30 to "30s", 60 to "1m", 120 to "2m", 300 to "5m")
+                intervals.forEach { (seconds, label) ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().clickable { onIntervalChange(seconds) }
+                    ) {
+                        RadioButton(selected = currentInterval == seconds, onClick = { onIntervalChange(seconds) })
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(label)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("v0.6.2", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } }
+    )
 }

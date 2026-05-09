@@ -11,6 +11,7 @@ import com.bushop.sg.domain.model.DuplicateStopException
 import com.bushop.sg.domain.model.BusStop
 import com.bushop.sg.domain.model.BusStopWithArrivals
 import com.bushop.sg.domain.model.NetworkResult
+import com.bushop.sg.domain.model.ThemeMode
 import com.bushop.sg.domain.repository.BusRepository
 import com.bushop.sg.domain.usecase.AutoRefreshController
 import com.bushop.sg.domain.usecase.BusStopUseCase
@@ -41,6 +42,9 @@ class MainViewModel(
     private var isAutoRefreshing = false
 
     private val autoRefreshController = AutoRefreshController(viewModelScope)
+
+    private val _pinnedServices = MutableStateFlow<Set<String>>(emptySet())
+    val pinnedServices: StateFlow<Set<String>> = _pinnedServices.asStateFlow()
 
     private val _savedStops = MutableStateFlow<List<BusStopWithArrivals>>(emptyList())
     val savedStops: StateFlow<List<BusStopWithArrivals>> = _savedStops.asStateFlow()
@@ -82,8 +86,21 @@ class MainViewModel(
         _apiStatus.value = ApiStatus.Healthy
     }
 
-    // 0 = system, 1 = light, 2 = dark
-    var themeMode by mutableStateOf(0)
+    // ── Theme ──
+
+    private val _themeModeFlow = MutableStateFlow(ThemeMode.SYSTEM)
+    val themeModeFlow: StateFlow<ThemeMode> = _themeModeFlow.asStateFlow()
+
+    fun setThemeMode(mode: ThemeMode) {
+        _themeModeFlow.value = mode
+        viewModelScope.launch {
+            repository.setThemeMode(mode)
+        }
+    }
+
+    // ── Index readiness ──
+
+    val isIndexReady: StateFlow<Boolean> = busStopIndex.isReady
 
     // Reference addition order from repository (used to restore position on unpin)
     private var additionOrder: List<String> = emptyList()
@@ -91,7 +108,9 @@ class MainViewModel(
     init {
         // Restore persisted preferences
         viewModelScope.launch {
-            themeMode = repository.getThemeModeOnce()
+            repository.themeModeFlow.collect { mode ->
+                _themeModeFlow.value = mode
+            }
         }
         viewModelScope.launch {
             autoRefreshIntervalSeconds = repository.getAutoRefreshIntervalOnce()
@@ -99,29 +118,45 @@ class MainViewModel(
                 autoRefreshController.start(autoRefreshIntervalSeconds) { refreshAll(isAutoRefresh = true) }
             }
         }
+        viewModelScope.launch {
+            repository.pinnedServicesFlow.collect { pinned ->
+                _pinnedServices.value = pinned
+            }
+        }
 
         viewModelScope.launch {
-            combine(
+            val baseFlow = combine(
                 repository.savedBusStops,
                 repository.cachedBusServices,
                 repository.cachedTimestamps,
-                repository.collapsedStopCodes,
+                repository.collapsedStopsFlow,
                 _sortByEarliest
-            ) { stops, cached, timestamps, collapsedCodes, sortByEarliest ->
+            ) { stops, cached, timestamps, collapsedStops, sortByEarliest ->
                 stops.map { stop ->
                     val cachedServices = cached[stop.code] ?: emptyList()
                     val existing = _savedStops.value.find { it.busStop.code == stop.code }
-                    val sortedServices = useCase.sortServices(cachedServices, sortByEarliest)
                     BusStopWithArrivals(
                         busStop = stop,
-                        services = sortedServices,
+                        services = cachedServices,
                         isLoading = existing?.isLoading ?: false,
                         error = existing?.error,
                         isOffline = existing?.isOffline ?: false,
                         lastUpdated = existing?.lastUpdated ?: 0L,
                         cachedAt = timestamps[stop.code] ?: 0L,
-                        isCollapsed = existing?.isCollapsed ?: collapsedCodes.contains(stop.code),
+                        isCollapsed = existing?.isCollapsed ?: collapsedStops.contains(stop.code),
                         isPinned = existing?.isPinned ?: false
+                    )
+                } to sortByEarliest
+            }
+            combine(baseFlow, _pinnedServices) { (stops, sortByEarliest), pinned ->
+                stops.map { stopWithArrivals ->
+                    val pinnedForStop = pinned
+                        .filter { it.startsWith("${stopWithArrivals.busStop.code}:") }
+                        .map { it.substringAfter(":") }.toSet()
+                    stopWithArrivals.copy(
+                        services = useCase.sortServicesWithPins(
+                            stopWithArrivals.services, pinnedForStop, sortByEarliest
+                        )
                     )
                 }
             }.collect { list ->
@@ -253,7 +288,10 @@ class MainViewModel(
             is NetworkResult.Success -> {
                 consecutiveFailures = 0
                 _apiStatus.value = ApiStatus.Healthy
-                val sortedServices = useCase.sortServices(result.data, _sortByEarliest.value)
+                val pinnedForStop = _pinnedServices.value
+                    .filter { it.startsWith("${code}:") }
+                    .map { it.substringAfter(":") }.toSet()
+                val sortedServices = useCase.sortServicesWithPins(result.data, pinnedForStop, _sortByEarliest.value)
                 _savedStops.value = _savedStops.value.toMutableList().apply {
                     this[index] = this[index].copy(
                         services = sortedServices,
@@ -323,16 +361,11 @@ class MainViewModel(
     }
 
     fun toggleThemeMode() {
-        themeMode = (themeMode + 1) % 3
-        viewModelScope.launch {
-            repository.setThemeMode(themeMode)
-        }
-    }
-
-    val themeIcon: String get() = when (themeMode) {
-        1 -> "light"
-        2 -> "dark"
-        else -> "system"
+        setThemeMode(when (_themeModeFlow.value) {
+            ThemeMode.SYSTEM -> ThemeMode.LIGHT
+            ThemeMode.LIGHT -> ThemeMode.DARK
+            ThemeMode.DARK -> ThemeMode.SYSTEM
+        })
     }
 
     fun toggleSortOrder() {
@@ -346,9 +379,23 @@ class MainViewModel(
         saveCollapseJob?.cancel()
         saveCollapseJob = viewModelScope.launch {
             delay(500)
-            repository.setCollapsedStops(collapsedCodes)
+            repository.setCollapsedStops(collapsedCodes.toSet())
         }
     }
+
+    fun togglePinService(stopCode: String, serviceNo: String) {
+        val key = "$stopCode:$serviceNo"
+        val updated = _pinnedServices.value.toMutableSet().apply {
+            if (contains(key)) remove(key) else add(key)
+        }
+        _pinnedServices.value = updated
+        viewModelScope.launch {
+            repository.savePinnedServices(updated)
+        }
+    }
+
+    fun isServicePinned(stopCode: String, serviceNo: String): Boolean =
+        "$stopCode:$serviceNo" in _pinnedServices.value
 
     fun togglePin(code: String) {
         val index = _savedStops.value.indexOfFirst { it.busStop.code == code }
