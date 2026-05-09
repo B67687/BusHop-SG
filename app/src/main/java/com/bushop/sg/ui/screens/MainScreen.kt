@@ -39,6 +39,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -295,38 +297,61 @@ fun MainScreen(viewModel: MainViewModel) {
                             )
                         }
                     } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(
-                                start = 16.dp, end = 16.dp, top = 16.dp, bottom = 40.dp
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        val pullRefreshState = rememberPullToRefreshState()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .nestedScroll(pullRefreshState.nestedScrollConnection)
                         ) {
-                    items(
-                        items = savedStops,
-                        key = { it.busStop.code }
-                    ) { stopWithArrivals ->
-                    BusStopCard(
-                        stop = stopWithArrivals,
-                        onRefresh = { viewModel.refreshArrivals(stopWithArrivals.busStop.code) },
-                        onToggleCollapse = { viewModel.toggleCollapse(stopWithArrivals.busStop.code) },
-                        onTogglePin = { viewModel.togglePin(stopWithArrivals.busStop.code) },
-                        onDelete = {
-                            deleteTarget = stopWithArrivals.busStop.code
-                        },
-                        onTogglePinService = { serviceNo ->
-                            viewModel.togglePinService(stopWithArrivals.busStop.code, serviceNo)
-                        },
-                        pinnedServiceNos = pinnedServices
-                            .filter { it.startsWith("${stopWithArrivals.busStop.code}:") }
-                            .map { it.substringAfter(":") }.toSet()
-                    )
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(
+                                    start = 16.dp, end = 16.dp, top = 16.dp, bottom = 40.dp
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(
+                                    items = savedStops,
+                                    key = { it.busStop.code }
+                                ) { stopWithArrivals ->
+                                    BusStopCard(
+                                        stop = stopWithArrivals,
+                                        onRefresh = { viewModel.refreshArrivals(stopWithArrivals.busStop.code) },
+                                        onToggleCollapse = { viewModel.toggleCollapse(stopWithArrivals.busStop.code) },
+                                        onTogglePin = { viewModel.togglePin(stopWithArrivals.busStop.code) },
+                                        onDelete = { deleteTarget = stopWithArrivals.busStop.code },
+                                        onTogglePinService = { serviceNo ->
+                                            viewModel.togglePinService(stopWithArrivals.busStop.code, serviceNo)
+                                        },
+                                        pinnedServiceNos = pinnedServices
+                                            .filter { it.startsWith("${stopWithArrivals.busStop.code}:") }
+                                            .map { it.substringAfter(":") }.toSet()
+                                    )
+                                }
+                            }
+                            var hasTriggeredRefresh by remember { mutableStateOf(false) }
+                            if (pullRefreshState.isRefreshing && !hasTriggeredRefresh) {
+                                LaunchedEffect(pullRefreshState.isRefreshing) {
+                                    viewModel.refreshAll()
+                                    hasTriggeredRefresh = true
+                                }
+                            }
+                            if (!viewModel.isRefreshing && hasTriggeredRefresh && pullRefreshState.isRefreshing) {
+                                LaunchedEffect(viewModel.isRefreshing) {
+                                    pullRefreshState.endRefresh()
+                                    hasTriggeredRefresh = false
+                                }
+                            }
+                            PullToRefreshContainer(
+                                state = pullRefreshState,
+                                modifier = Modifier.align(Alignment.TopCenter)
+                            )
+                        }
                     }
                 }
-            }  // close else
-            }  // close inner Box
             }  // close Column
-            if (viewModel.lastUpdatedAll > 0) {
+
+        if (viewModel.lastUpdatedAll > 0) {
             val pillBg by animateColorAsState(
                 targetValue = if (viewModel.isRefreshing)
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
@@ -353,9 +378,9 @@ fun MainScreen(viewModel: MainViewModel) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }  // close pill if
+        }
         }  // close outer Box
-        }  // close Scaffold content
+    }  // close Scaffold content
 
     if (showSettings) {
         SettingsSheet(
