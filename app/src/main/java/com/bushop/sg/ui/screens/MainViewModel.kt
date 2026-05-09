@@ -409,6 +409,18 @@ class MainViewModel(
         }
     }
 
+    // ── Lifecycle-aware auto-refresh ──
+
+    fun pauseAutoRefresh() {
+        autoRefreshController.stop()
+    }
+
+    fun resumeAutoRefresh() {
+        if (autoRefreshIntervalSeconds > 0) {
+            autoRefreshController.start(autoRefreshIntervalSeconds) { refreshAll(isAutoRefresh = true) }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         autoRefreshController.onCleared()
