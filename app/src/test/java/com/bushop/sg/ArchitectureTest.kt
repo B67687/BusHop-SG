@@ -109,4 +109,43 @@ class ArchitectureTest {
             violations.isEmpty()
         )
     }
+
+    // ── ProGuard keep rules must reference existing packages ──
+
+    @Test
+    fun `proguard keep rules match existing packages`() {
+        val proguardFile = File(projectRoot, "app/proguard-rules.pro")
+        Assert.assertTrue("proguard-rules.pro not found", proguardFile.exists())
+        val lines = proguardFile.readLines()
+        val violations = mutableListOf<String>()
+        val keepPattern = Regex("""^-keep\s+(class\s+[\w.]+)""")
+        val keepAllowObfuscationPattern = Regex("""^-keep,allowobfuscation\s+(class\s+[\w.]+)""")
+        for (line in lines) {
+            val trimmed = line.trim()
+            for (pattern in listOf(keepPattern, keepAllowObfuscationPattern)) {
+                val match = pattern.find(trimmed)
+                if (match != null) {
+                    val classSpec = match.groupValues[1]
+                    val packagePart = classSpec
+                        .removePrefix("class ")
+                        .removeSuffix(".**")
+                        .removeSuffix(".*")
+                        .replace('.', '/')
+                    val domainDir = File(projectRoot, "domain/src/main/kotlin/$packagePart")
+                    val dataDir = File(projectRoot, "data/src/main/kotlin/$packagePart")
+                    val appDir = File(projectRoot, "app/src/main/kotlin/$packagePart")
+                    if (!domainDir.exists() && !dataDir.exists() && !appDir.exists()) {
+                        violations.add("'${trimmed}' — package '$packagePart' not found in any module")
+                    }
+                }
+            }
+        }
+        Assert.assertTrue(
+            buildString {
+                appendLine("ProGuard -keep rules reference non-existent packages:")
+                violations.forEach { appendLine("  $it") }
+            },
+            violations.isEmpty()
+        )
+    }
 }

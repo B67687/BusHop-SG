@@ -1,21 +1,22 @@
 package com.bushop.sg.data.repository
 
 import com.bushop.sg.data.api.retrySuspend
+import com.bushop.sg.data.local.BusStopIndex
 import com.bushop.sg.data.local.BusStopStorage
 import com.bushop.sg.domain.api.BusArrivalDataSource
 import com.bushop.sg.domain.model.BusService
 import com.bushop.sg.domain.model.BusStop
 import com.bushop.sg.domain.model.NetworkResult
+import com.bushop.sg.domain.model.ThemeMode
 import com.bushop.sg.domain.model.toNetworkResult
 import com.bushop.sg.domain.repository.BusRepository
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.StateFlow
 
 class BusRepositoryImpl(
     private val storage: BusStopStorage,
-    private val dataSource: BusArrivalDataSource
+    private val dataSource: BusArrivalDataSource,
+    private val busStopIndex: BusStopIndex
 ) : BusRepository {
 
     override val savedBusStops: Flow<List<BusStop>> = storage.savedBusStops
@@ -24,9 +25,13 @@ class BusRepositoryImpl(
 
     override val cachedTimestamps: Flow<Map<String, Long>> = storage.cachedTimestamps
 
-    override val collapsedStopCodes: Flow<List<String>> = storage.collapsedStopCodes
+    override val themeModeFlow: Flow<ThemeMode> = storage.themeModeFlow
 
-    override val themeMode: Flow<Int> = storage.themeMode
+    override val collapsedStopsFlow: Flow<Set<String>> = storage.collapsedStopsFlow
+
+    override val pinnedServicesFlow: Flow<Set<String>> = storage.pinnedServices
+
+    override val isIndexReady: StateFlow<Boolean> = busStopIndex.isReady
 
     override val autoRefreshInterval: Flow<Int> = storage.autoRefreshInterval
 
@@ -36,16 +41,16 @@ class BusRepositoryImpl(
         storage.saveAutoRefreshInterval(seconds)
     }
 
-    override suspend fun getThemeModeOnce(): Int = withContext(Dispatchers.IO) {
-        storage.themeMode.first()
+    override suspend fun setCollapsedStops(stops: Set<String>) {
+        storage.saveCollapsedStops(stops)
     }
 
-    override suspend fun setThemeMode(mode: Int) {
+    override suspend fun setThemeMode(mode: ThemeMode) {
         storage.saveThemeMode(mode)
     }
 
-    override suspend fun setCollapsedStops(codes: List<String>) {
-        storage.saveCollapsedStops(codes)
+    override suspend fun savePinnedServices(pinned: Set<String>) {
+        storage.savePinnedServices(pinned)
     }
 
     override suspend fun addBusStop(stop: BusStop): Result<Unit> {
