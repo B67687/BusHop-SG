@@ -27,7 +27,7 @@ class LtaBusArrivalDataSource(
             .build()
 
         Retrofit.Builder()
-            .baseUrl("https://datamall2.mytransport.sg/ltaodataservice/")
+            .baseUrl("https://datamall.lta.gov.sg/ltaodataservice/")
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
