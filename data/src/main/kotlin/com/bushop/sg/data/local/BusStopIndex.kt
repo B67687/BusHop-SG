@@ -21,8 +21,6 @@ class BusStopIndex(private val context: Context) {
 
     @Volatile
     private var stops: Map<String, BusStopEntry> = emptyMap()
-    @Volatile
-    private var stopsByName: Map<String, List<BusStopEntry>> = emptyMap()
 
     private val _isReady = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
@@ -53,25 +51,51 @@ class BusStopIndex(private val context: Context) {
                 } else null
             }
             stops = parsed.associateBy { it.code }
-            stopsByName = parsed.groupBy { it.name.lowercase() }
         }
         _isReady.value = true
     }
 
     /** Returns empty results if index hasn't loaded yet. */
     fun search(query: String): List<BusStopEntry> {
-        val q = query.trim()
-        if (q.length < 2 || stops.isEmpty()) return emptyList()
-        val results = linkedSetOf<BusStopEntry>()
-        results.addAll(stops.values.filter { it.code.startsWith(q) }.take(5))
-        if (results.size < 20) {
-            val parts = q.lowercase().split(" ")
-            results.addAll(stops.values.filter { entry ->
-                val lower = entry.name.lowercase()
-                parts.all { it in lower } || entry.road.lowercase().contains(q.lowercase())
-            }.take(20 - results.size))
+        val q = query.trim().lowercase()
+        if (q.length < 1 || stops.isEmpty()) return emptyList()
+
+        // Fast path: pure digit queries — code prefix only
+        if (q.all { it.isDigit() }) {
+            return stops.values
+                .filter { it.code.startsWith(q) }
+                .take(20)
         }
-        return results.take(20)
+
+        // Scored relevance search for name/road queries
+        data class Scored(val entry: BusStopEntry, val score: Int)
+        val queryWords = q.split(" ")
+        val results = stops.values.mapNotNull { entry ->
+            val nameLower = entry.name.lowercase()
+            val roadLower = entry.road.lowercase()
+            val score = when {
+                // Name starts with full query — excellent
+                nameLower.startsWith(q) -> 800
+                // Any word in name starts with full query — very good
+                nameLower.split(" ").any { it.startsWith(q) } -> 700
+                // Any word in name starts with any query word (min 2 chars) — good
+                queryWords.any { word -> word.length >= 2 && nameLower.split(" ").any { it.startsWith(word) } } -> 600
+                // All query words appear in name (substring) — decent
+                queryWords.all { it in nameLower } -> 500
+                // Any query word appears in name — fair
+                queryWords.any { it in nameLower } -> 300
+                // Any query word appears in road — weak
+                queryWords.any { it in roadLower } -> 200
+                // Name contains query as substring — fallback
+                q in nameLower -> 100
+                else -> null
+            }?.let { Scored(entry, it) }
+            score
+        }
+        return results
+            .sortedByDescending { it.score }
+            .take(20)
+            .map { it.entry }
     }
 
     /** Returns null if index hasn't loaded yet. */
