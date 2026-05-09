@@ -402,10 +402,14 @@ fun BusServiceRow(service: BusService, isPinned: Boolean = false, onTogglePinSer
                     Text(
                         text = arrival.busType,
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = " · ",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(
                         imageVector = when {
                             arrival.load.contains("Seats") -> Icons.Default.Chair
@@ -422,7 +426,8 @@ fun BusServiceRow(service: BusService, isPinned: Boolean = false, onTogglePinSer
                     Text(
                         text = arrival.load,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
                 }
             }
