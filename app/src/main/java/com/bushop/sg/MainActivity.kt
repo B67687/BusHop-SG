@@ -8,6 +8,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -15,6 +17,7 @@ import com.bushop.sg.data.api.RetrofitBusArrivalDataSource
 import com.bushop.sg.data.local.BusStopIndex
 import com.bushop.sg.data.local.BusStopStorage
 import com.bushop.sg.data.repository.BusRepositoryImpl
+import com.bushop.sg.domain.model.ThemeMode
 import com.bushop.sg.ui.screens.MainScreen
 import com.bushop.sg.ui.screens.MainViewModel
 import com.bushop.sg.ui.theme.BusHopTheme
@@ -28,20 +31,19 @@ class MainActivity : ComponentActivity() {
 
         val storage = BusStopStorage(applicationContext)
         val dataSource = RetrofitBusArrivalDataSource()
-        val repository = BusRepositoryImpl(storage, dataSource)
         val busStopIndex = BusStopIndex(applicationContext).also { idx ->
-            // Kick off background load — scoped to Activity lifecycle
             lifecycleScope.launch(Dispatchers.IO) { idx.load() }
         }
+        val repository = BusRepositoryImpl(storage, dataSource, busStopIndex)
         val viewModelFactory = MainViewModel.Factory(repository, busStopIndex)
 
         setContent {
             val viewModel: MainViewModel = viewModel(factory = viewModelFactory)
-            val isDarkTheme = when (viewModel.themeMode) {
-                0 -> isSystemInDarkTheme()
-                1 -> false
-                2 -> true
-                else -> isSystemInDarkTheme()
+            val themeMode by viewModel.themeModeFlow.collectAsState()
+            val isDarkTheme = when (themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
             }
             BusHopTheme(darkTheme = isDarkTheme) {
                 Surface(

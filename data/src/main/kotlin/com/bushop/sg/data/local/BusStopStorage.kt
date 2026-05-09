@@ -10,6 +10,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.bushop.sg.domain.model.BusService
 import com.bushop.sg.domain.model.BusStop
 import com.bushop.sg.domain.model.DuplicateStopException
+import com.bushop.sg.domain.model.ThemeMode
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
@@ -159,34 +160,67 @@ class BusStopStorage(private val context: Context) {
 
     // ── Theme mode ──
 
-    val themeMode: Flow<Int> = context.dataStore.data
-        .map { prefs -> prefs[intPreferencesKey("theme_mode")] ?: 0 }
+    val themeModeFlow: Flow<ThemeMode> = context.dataStore.data
+        .map { prefs ->
+            val raw = prefs[stringPreferencesKey("theme_mode_str")] ?: "system"
+            when (raw) {
+                "light" -> ThemeMode.LIGHT
+                "dark" -> ThemeMode.DARK
+                else -> ThemeMode.SYSTEM
+            }
+        }
         .distinctUntilChanged()
 
-    suspend fun saveThemeMode(mode: Int) {
+    suspend fun saveThemeMode(mode: ThemeMode) {
         context.dataStore.edit { prefs ->
-            prefs[intPreferencesKey("theme_mode")] = mode
+            val raw = when (mode) {
+                ThemeMode.SYSTEM -> "system"
+                ThemeMode.LIGHT -> "light"
+                ThemeMode.DARK -> "dark"
+            }
+            prefs[stringPreferencesKey("theme_mode_str")] = raw
         }
     }
 
-    // ── Collapsed stops ──
+    // ── Collapsed stops (type-safe Set) ──
 
-    val collapsedStopCodes: Flow<List<String>> = context.dataStore.data
-        .map { prefs -> parseCollapsedCodes(prefs[stringPreferencesKey("collapsed_stops")]) }
+    val collapsedStopsFlow: Flow<Set<String>> = context.dataStore.data
+        .map { prefs -> parseStringSet(prefs[stringPreferencesKey("collapsed_stops_set")]) }
         .distinctUntilChanged()
 
-    private fun parseCollapsedCodes(json: String?): List<String> {
-        val text = json ?: return emptyList()
+    suspend fun saveCollapsedStops(stops: Set<String>) {
+        context.dataStore.edit { prefs ->
+            prefs[stringPreferencesKey("collapsed_stops_set")] = gson.toJson(stops.toList())
+        }
+    }
+
+    private fun parseStringSet(json: String?): Set<String> {
+        val text = json ?: return emptySet()
         return try {
-            gson.fromJson(text, object : TypeToken<List<String>>() {}.type) ?: emptyList()
+            gson.fromJson(text, object : TypeToken<Set<String>>() {}.type) ?: emptySet()
         } catch (e: Exception) {
-            emptyList()
+            emptySet()
         }
     }
 
-    suspend fun saveCollapsedStops(codes: List<String>) {
+    // ── Pinned services (per-service within a stop) ──
+
+    val pinnedServices: Flow<Set<String>> = context.dataStore.data
+        .map { prefs -> parsePinnedServices(prefs[stringPreferencesKey("pinned_services")]) }
+        .distinctUntilChanged()
+
+    private fun parsePinnedServices(json: String?): Set<String> {
+        val text = json ?: return emptySet()
+        return try {
+            gson.fromJson(text, object : TypeToken<Set<String>>() {}.type) ?: emptySet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+    }
+
+    suspend fun savePinnedServices(pinned: Set<String>) {
         context.dataStore.edit { prefs ->
-            prefs[stringPreferencesKey("collapsed_stops")] = gson.toJson(codes)
+            prefs[stringPreferencesKey("pinned_services")] = gson.toJson(pinned.toList())
         }
     }
 }
