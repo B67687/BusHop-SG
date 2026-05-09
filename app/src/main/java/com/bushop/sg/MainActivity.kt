@@ -11,6 +11,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.bushop.sg.data.api.LtaBusArrivalDataSource
 import com.bushop.sg.data.local.BusStopIndex
 import com.bushop.sg.data.local.BusStopStorage
 import com.bushop.sg.data.repository.BusRepositoryImpl
@@ -26,7 +27,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val storage = BusStopStorage(applicationContext)
-        val repository = BusRepositoryImpl(storage)
+        val dataSource = LtaBusArrivalDataSource(BuildConfig.LTA_API_KEY)
+        val repository = BusRepositoryImpl(storage, dataSource)
         val busStopIndex = BusStopIndex(applicationContext).also { idx ->
             // Kick off background load — scoped to Activity lifecycle
             lifecycleScope.launch(Dispatchers.IO) { idx.load() }
