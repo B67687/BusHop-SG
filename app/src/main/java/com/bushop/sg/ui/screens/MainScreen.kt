@@ -281,7 +281,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                     text = "Loading stops…",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            )
                             }
                         }
                     } else if (savedStops.isEmpty()) {
@@ -342,13 +342,15 @@ fun MainScreen(viewModel: MainViewModel) {
                                     hasTriggeredRefresh = false
                                 }
                             }
-                            PullToRefreshContainer(
-                                state = pullRefreshState,
-                                modifier = Modifier.align(Alignment.TopCenter)
-                            )
+                            if (pullRefreshState.isRefreshing || pullRefreshState.progress > 0f) {
+                                PullToRefreshContainer(
+                                    state = pullRefreshState,
+                                    modifier = Modifier.align(Alignment.TopCenter)
+                                )
+                            }
                         }
                     }
-                }
+                }  // close weight(1f) Box
             }  // close Column
 
         if (viewModel.lastUpdatedAll > 0) {

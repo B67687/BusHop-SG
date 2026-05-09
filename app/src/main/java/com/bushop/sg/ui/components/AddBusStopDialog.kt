@@ -49,7 +49,6 @@ fun AddBusStopDialog(
 
     LaunchedEffect(searchQuery) {
         if (searchQuery.length >= 2) {
-            delay(300)
             onSearchQueryChanged(searchQuery.trim())
         }
     }
