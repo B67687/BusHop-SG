@@ -1,6 +1,5 @@
 package com.bushop.sg.data.repository
 
-import com.bushop.sg.data.api.RetrofitBusArrivalDataSource
 import com.bushop.sg.data.api.retrySuspend
 import com.bushop.sg.data.local.BusStopStorage
 import com.bushop.sg.domain.api.BusArrivalDataSource
@@ -16,7 +15,7 @@ import kotlinx.coroutines.withContext
 
 class BusRepositoryImpl(
     private val storage: BusStopStorage,
-    private val dataSource: BusArrivalDataSource = RetrofitBusArrivalDataSource()
+    private val dataSource: BusArrivalDataSource
 ) : BusRepository {
 
     override val savedBusStops: Flow<List<BusStop>> = storage.savedBusStops
