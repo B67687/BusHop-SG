@@ -3,7 +3,6 @@ package com.bushop.sg.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.layout.PaddingValues
@@ -260,7 +259,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent,
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.30f),
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                     scrolledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
                 )
@@ -284,7 +283,8 @@ fun MainScreen(viewModel: MainViewModel) {
                 .fillMaxSize()
         .padding(
             start = paddingValues.calculateLeftPadding(LayoutDirection.Ltr),
-            top = paddingValues.calculateTopPadding(),
+            // Let content scroll behind the top bar by subtracting its height
+            top = paddingValues.calculateTopPadding() - 56.dp,
             end = paddingValues.calculateRightPadding(LayoutDirection.Ltr),
             bottom = paddingValues.calculateBottomPadding()
         )
@@ -331,7 +331,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                 state = listState,
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(
-                                    start = 16.dp, end = 16.dp, top = 16.dp, bottom = 40.dp
+                                    start = 16.dp, end = 16.dp, top = 72.dp, bottom = 40.dp
                                 ),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
