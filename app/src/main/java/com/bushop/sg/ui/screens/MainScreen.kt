@@ -3,6 +3,7 @@ package com.bushop.sg.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.layout.PaddingValues
@@ -66,7 +67,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
@@ -200,6 +200,7 @@ fun MainScreen(viewModel: MainViewModel) {
         topBar = {
             CenterAlignedTopAppBar(
                 scrollBehavior = scrollBehavior,
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -289,6 +290,10 @@ fun MainScreen(viewModel: MainViewModel) {
             bottom = paddingValues.calculateBottomPadding()
         )
         ) {
+            // ── Top bar translucency: content extends behind the bar ──
+            // The top bar starts at y=0 with windowInsets=0, overlapping the content area.
+            // The Scaffold provides status-bar-only top padding here.
+            // Content scrolls behind the bar, visible through the translucent containerColor.
             Column(modifier = Modifier.fillMaxSize()) {
                 ApiStatusBanner(
                     status = apiStatus,
@@ -311,12 +316,10 @@ fun MainScreen(viewModel: MainViewModel) {
                             }
                         }
                     } else if (savedStops.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
                             Text(
                                 text = "No bus stops saved yet.\nTap + to add your first stop.",
+                                modifier = Modifier.align(Alignment.Center),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
@@ -333,7 +336,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                 state = listState,
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(
-                                    start = 16.dp, end = 16.dp, top = 16.dp, bottom = 40.dp
+                                    start = 16.dp, end = 16.dp, top = 80.dp, bottom = 40.dp
                                 ),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
@@ -410,39 +413,6 @@ fun MainScreen(viewModel: MainViewModel) {
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                // Legend / info button
-                var showLegend by remember { mutableStateOf(false) }
-                Box(
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f))
-                        .clickable { showLegend = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "i",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                if (showLegend) {
-                    AlertDialog(
-                        onDismissRequest = { showLegend = false },
-                        title = { Text("Icon Legend") },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Outlined.Accessibility, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Wheelchair accessible bus", style = MaterialTheme.typography.bodyMedium)
-                                }
-                            }
-                        },
-                        confirmButton = { TextButton(onClick = { showLegend = false }) { Text("OK") } }
                     )
                 }
             }
@@ -569,6 +539,19 @@ private fun SettingsSheet(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(label)
                     }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Icon Legend", style = MaterialTheme.typography.titleSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Accessibility, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Wheelchair accessible bus", style = MaterialTheme.typography.bodySmall)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.DirectionsBus, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Operator badge logo", style = MaterialTheme.typography.bodySmall)
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
