@@ -25,5 +25,6 @@ interface BusRepository {
     suspend fun savePinnedServices(pinned: Set<String>)
     suspend fun addBusStop(stop: BusStop): Result<Unit>
     suspend fun removeBusStop(code: String)
+    suspend fun reorderStops(stops: List<BusStop>)
     suspend fun getBusArrivals(busStopCode: String): NetworkResult<List<BusService>>
 }

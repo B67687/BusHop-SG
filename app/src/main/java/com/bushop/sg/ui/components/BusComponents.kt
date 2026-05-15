@@ -40,6 +40,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.PushPin
@@ -81,8 +83,9 @@ fun BusStopCard(
     onToggleCollapse: () -> Unit,
     onTogglePin: () -> Unit,
     onDelete: () -> Unit,
-    onTogglePinService: (serviceNo: String) -> Unit = {},
+    onTogglePinService: (String) -> Unit,
     pinnedServiceNos: Set<String> = emptySet(),
+    onMoveStop: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val busStopCode = stop.busStop.code
@@ -190,6 +193,20 @@ fun BusStopCard(
                             modifier = Modifier.size(12.dp),
                             tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                    if (onMoveStop != null) {
+                        Box(
+                            modifier = Modifier.size(20.dp).clickable { onMoveStop(-1) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move up", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Box(
+                            modifier = Modifier.size(20.dp).clickable { onMoveStop(1) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move down", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                     Box(
                         modifier = Modifier
