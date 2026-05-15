@@ -10,8 +10,9 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.bushop.sg.domain.model.ColorSchemeOption
 
-private val LightColorScheme = lightColorScheme(
+val LightColorScheme = lightColorScheme(
     primary = Color(0xFF007AFF),
     onPrimary = Color.White,
     primaryContainer = Color(0xFFE8F0FE),
@@ -31,7 +32,7 @@ private val LightColorScheme = lightColorScheme(
     onError = Color.White
 )
 
-private val DarkColorScheme = darkColorScheme(
+val DarkColorScheme = darkColorScheme(
     primary = Color(0xFF0A84FF),
     onPrimary = Color.White,
     primaryContainer = Color(0xFF1C3A5E),
@@ -54,15 +55,20 @@ private val DarkColorScheme = darkColorScheme(
 @Composable
 fun BusHopTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    colorSchemeOption: ColorSchemeOption = ColorSchemeOption.DYNAMIC,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
-    val colorScheme = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (darkTheme) dynamicDarkColorScheme(context)
-            else dynamicLightColorScheme(context)
+    val colorScheme = when (colorSchemeOption) {
+        ColorSchemeOption.DYNAMIC -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (darkTheme) dynamicDarkColorScheme(context)
+                else dynamicLightColorScheme(context)
+            } else {
+                if (darkTheme) DarkColorScheme else LightColorScheme
+            }
         }
-        else -> {
+        ColorSchemeOption.BLUE -> {
             if (darkTheme) DarkColorScheme else LightColorScheme
         }
     }

@@ -27,12 +27,26 @@ class BusStopUseCase {
         return pinned + sortedUnpinned
     }
 
-    /** Pinning is now purely visual — no reordering. */
+    /** Reorder pinned stops to top. Unpinning restores addition order. */
     fun applyPinning(
         stops: List<BusStopWithArrivals>,
         wasPinned: Boolean,
         additionOrder: List<String>
-    ): List<BusStopWithArrivals> = stops
+    ): List<BusStopWithArrivals> {
+        val pinned = stops.filter { it.isPinned }
+        val unpinned = stops.filter { !it.isPinned }
+        return if (wasPinned) {
+            val order = additionOrder.filter { code ->
+                unpinned.any { it.busStop.code == code }
+            }
+            val sorted = order.mapNotNull { code ->
+                unpinned.find { it.busStop.code == code }
+            }
+            pinned + sorted
+        } else {
+            pinned + unpinned
+        }
+    }
 
     fun toggleCollapsed(
         stops: List<BusStopWithArrivals>,
