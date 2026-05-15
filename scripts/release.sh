@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 VERSION=$(grep versionName app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
 TAG="v$VERSION"
-APK_PATH="app/build/outputs/apk/debug/app-debug-bus-hop.apk"
+APK_PATH="app/build/outputs/apk/debug/bus-hop.apk"
 
 echo "═══ Building BusHop v$VERSION ═══"
 
