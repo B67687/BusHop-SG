@@ -55,28 +55,27 @@ android {
     }
 }
 
-/** Locate the debug APK (any filename), verify it has an AndroidManifest, then rename to a predictable name. */
+/** Locate the debug APK, verify it has an AndroidManifest, then rename predictably. */
 tasks.register("checkAndRenameDebugApk") {
     dependsOn("assembleDebug")
     doLast {
         val apkDir = layout.buildDirectory.dir("outputs/apk/debug").get().asFile
-        val apks = apkDir.listFiles { f -> f.name.endsWith(".apk") }
-            ?.filterNot { it.name.contains("unsigned", ignoreCase = true) }
-            ?.sortedByDescending { it.lastModified() }
-        val apk = apks?.firstOrNull()
-            ?: throw GradleException("No debug APK found in $apkDir (looked at ${apkDir.absolutePath})")
+        val apk = apkDir.listFiles { f -> f.name.endsWith(".apk") }
+            ?.filterNot { n -> n.name.contains("unsigned", ignoreCase = true) }
+            ?.maxByOrNull { n -> n.lastModified() }
+            ?: throw GradleException("No debug APK found in $apkDir")
 
-        // Verify APK has an AndroidManifest.xml (basic integrity check)
-        val zipFile = java.util.zip.ZipFile(apk)
-        val hasManifest = zipFile.entries().asSequence().any { it.name == "AndroidManifest.xml" }
-        val fileCount = zipFile.size()
         val totalBytes = apk.length()
-        zipFile.close()
+
+        // Verify APK has an AndroidManifest.xml using Gradle's zipTree
+        val apkTree = project.zipTree(apk)
+        val hasManifest = apkTree.matching { include("AndroidManifest.xml") }.files.isNotEmpty()
+        val fileCount = apkTree.files.size
 
         if (!hasManifest) {
             throw GradleException(
-                "APK $apk is CORRUPTED: no AndroidManifest.xml (${totalBytes / 1024} KB, $fileCount files). " +
-                "Run ./gradlew clean assembleDebug first."
+                "APK $apk CORRUPTED: no AndroidManifest.xml (${totalBytes / 1024} KB, $fileCount files). " +
+                "Run \"./gradlew clean assembleDebug\" first."
             )
         }
 
