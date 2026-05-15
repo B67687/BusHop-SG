@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BusHop-SG — Traffic Dashboard</title>
+  <style>
+    :root {
+      --bg: #0d1117; --card: #161b22; --border: #30363d;
+      --text: #e6edf3; --text2: #8b949e; --blue: #58a6ff;
+      --green: #3fb950; --orange: #d29922; --purple: #bc8cff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height: 1.6; }
+    .container { max-width: 800px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h1 { font-size: 1.5rem; margin-bottom: .25rem; }
+    .subtitle { color: var(--text2); font-size: .9rem; margin-bottom: 1.5rem; }
+    .subtitle a { color: var(--blue); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .75rem; margin-bottom: 2rem; }
+    .metric { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; }
+    .metric .val { font-size: 1.5rem; font-weight: 700; }
+    .metric .lbl { color: var(--text2); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+    .section { margin-bottom: 2rem; }
+    .section h2 { font-size: 1.1rem; margin-bottom: .75rem; }
+    table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 8px; overflow: hidden; }
+    th, td { padding: .6rem .75rem; text-align: left; border-bottom: 1px solid var(--border); font-size: .9rem; }
+    th { background: var(--bg); color: var(--text2); font-weight: 600; text-transform: uppercase; font-size: .75rem; letter-spacing: .05em; }
+    tr:last-child td { border-bottom: none; }
+    .note { color: var(--text2); font-size: .8rem; margin-top: 2rem; text-align: center; }
+    .val-blue { color: var(--blue); }
+    .val-green { color: var(--green); }
+    .val-purple { color: var(--purple); }
+    .val-orange { color: var(--orange); }
+    .bars { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding: 1rem 0; }
+    .bar { flex: 1; background: var(--blue); border-radius: 3px 3px 0 0; min-height: 2px; position: relative; opacity: .8; }
+    .bar:hover { opacity: 1; }
+    .bar-label { position: absolute; top: -1.2rem; left: 50%; transform: translateX(-50%); font-size: .65rem; color: var(--text2); white-space: nowrap; }
+    @media (max-width: 600px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 <a href="https://github.com/B67687/BusHop-SG" style="color:var(--text);text-decoration:none">BusHop-SG</a></h1>
+    <p class="subtitle"><a href="https://github.com/B67687/BusHop-SG">Repository</a> · Traffic data from GitHub API</p>
+    <div class="grid" id="metrics"></div>
+    <div class="section">
+      <h2>Last 7 Days</h2>
+      <div class="bars" id="bars"></div>
+    </div>
+    <div class="section">
+      <h2>Referrers</h2>
+      <table><thead><tr><th>Source</th><th>Count</th><th>Uniques</th></tr></thead><tbody id="refs"></tbody></table>
+    </div>
+    <div class="section">
+      <h2>Popular Paths</h2>
+      <table><thead><tr><th>Path</th><th>Count</th><th>Uniques</th></tr></thead><tbody id="paths"></tbody></table>
+    </div>
+    <div class="note">
+      Data updates daily at 3am UTC · <a href="https://gist.github.com/B67687/4845d76fc7e704afce78c827650bd0ce" style="color:var(--blue)">Raw data gist</a>
+    </div>
+  </div>
+  <script>
+    fetch('https://gist.githubusercontent.com/B67687/4845d76fc7e704afce78c827650bd0ce/raw/state.json')
+      .then(r => { if (!r.ok) throw new Error('no data yet'); return r.json(); })
+      .then(s => {
+        const org = s.totalOrganicClones ?? s.totalClones ?? 0;
+        document.getElementById('metrics').innerHTML = `
+          <div class="metric"><div class="val val-blue">${org.toLocaleString()}</div><div class="lbl">Organic Clones</div></div>
+          <div class="metric"><div class="val val-purple">${(s.totalUniqueClones ?? 0).toLocaleString()}</div><div class="lbl">Unique Cloners</div></div>
+          <div class="metric"><div class="val val-green">${(s.totalViews ?? 0).toLocaleString()}</div><div class="lbl">Views</div></div>
+          <div class="metric"><div class="val val-orange">${(s.totalUniqueViews ?? 0).toLocaleString()}</div><div class="lbl">Unique Viewers</div></div>
+          <div class="metric"><div class="val">${(s.totalDownloads ?? 0).toLocaleString()}</div><div class="lbl">Downloads</div></div>
+          <div class="metric"><div class="val">${s.stars ?? 0}</div><div class="lbl">★ Stars</div></div>
+        `;
+        const hist = (s.dailyHistory || []).slice(-7);
+        const bars = document.getElementById('bars');
+        const max = Math.max(...hist.map(d => (d.organicClones ?? d.clones ?? 0) + (d.downloads ?? 0)), 1);
+        bars.innerHTML = hist.map(d => {
+          const v = (d.organicClones ?? d.clones ?? 0) + (d.downloads ?? 0);
+          const pct = (v / max * 100) || 2;
+          const lbl = d.date.slice(5, 10);
+          return `<div class="bar" style="height:${pct}%" title="${v} installs"><span class="bar-label">${lbl}</span></div>`;
+        }).join('');
+        const refs = document.getElementById('refs');
+        (s.referrers || []).slice(0, 10).forEach(r => {
+          refs.innerHTML += `<tr><td>${r.source}</td><td>${r.count}</td><td>${r.uniques}</td></tr>`;
+        });
+        if (!refs.innerHTML) refs.innerHTML = '<tr><td colspan="3" style="color:var(--text2)">No referrer data yet</td></tr>';
+        const paths = document.getElementById('paths');
+        (s.popularPaths || []).slice(0, 10).forEach(p => {
+          paths.innerHTML += `<tr><td>${p.title || p.path}</td><td>${p.count}</td><td>${p.uniques}</td></tr>`;
+        });
+        if (!paths.innerHTML) paths.innerHTML = '<tr><td colspan="3" style="color:var(--text2)">No path data yet</td></tr>';
+      })
+      .catch(e => {
+        document.getElementById('metrics').innerHTML = `<p style="color:var(--text2);grid-column:1/-1">No traffic data yet. Workflow runs daily at 3am UTC.</p>`;
+      });
+  </script>
+</body>
+</html>
