@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BrightnessAuto
@@ -70,6 +71,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bushop.sg.data.local.BusStopEntry
+import com.bushop.sg.domain.model.ColorSchemeOption
 import com.bushop.sg.domain.model.ThemeMode
 import com.bushop.sg.ui.components.AddBusStopDialog
 import com.bushop.sg.BuildConfig
@@ -162,11 +164,23 @@ fun MainScreen(viewModel: MainViewModel) {
     val pinnedServices by viewModel.pinnedServices.collectAsState()
     val themeMode by viewModel.themeModeFlow.collectAsState()
     val isIndexReady by viewModel.isIndexReady.collectAsState()
+    val colorSchemeOption by viewModel.colorSchemeOptionFlow.collectAsState()
+    val listState = rememberLazyListState()
     var showSettings by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     
     var deleteTarget by remember { mutableStateOf<String?>(null) }
+
+    // Scroll to top when a new stop is pinned
+    var prevPinnedCount by remember { mutableStateOf(0) }
+    val currentPinnedCount = savedStops.count { it.isPinned }
+    LaunchedEffect(currentPinnedCount) {
+        if (currentPinnedCount > prevPinnedCount && currentPinnedCount > 0) {
+            listState.animateScrollToItem(0)
+        }
+        prevPinnedCount = currentPinnedCount
+    }
 
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collect { message ->
@@ -315,6 +329,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                 .nestedScroll(pullRefreshState.nestedScrollConnection)
                         ) {
                             LazyColumn(
+                                state = listState,
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(
                                     start = 16.dp, end = 16.dp, top = 16.dp, bottom = 40.dp
@@ -399,11 +414,13 @@ fun MainScreen(viewModel: MainViewModel) {
         SettingsSheet(
             currentTheme = themeMode,
             currentInterval = viewModel.autoRefreshIntervalSeconds,
+            currentColorScheme = colorSchemeOption,
             onThemeChange = { viewModel.setThemeMode(it) },
             onIntervalChange = { seconds ->
                 viewModel.setAutoRefreshInterval(seconds)
                 showSettings = false
             },
+            onColorSchemeChange = { viewModel.setColorScheme(it) },
             onDismiss = { showSettings = false }
         )
     }
@@ -480,8 +497,10 @@ fun MainScreen(viewModel: MainViewModel) {
 private fun SettingsSheet(
     currentTheme: ThemeMode,
     currentInterval: Int,
+    currentColorScheme: ColorSchemeOption,
     onThemeChange: (ThemeMode) -> Unit,
     onIntervalChange: (Int) -> Unit,
+    onColorSchemeChange: (ColorSchemeOption) -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -499,6 +518,19 @@ private fun SettingsSheet(
                         RadioButton(selected = currentTheme == mode, onClick = { onThemeChange(mode) })
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(text = when (mode) { ThemeMode.SYSTEM -> "System"; ThemeMode.LIGHT -> "Light"; ThemeMode.DARK -> "Dark" })
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Color Scheme", style = MaterialTheme.typography.titleSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(4.dp))
+                ColorSchemeOption.entries.forEach { option ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().clickable { onColorSchemeChange(option) }
+                    ) {
+                        RadioButton(selected = currentColorScheme == option, onClick = { onColorSchemeChange(option) })
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = option.displayName)
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
