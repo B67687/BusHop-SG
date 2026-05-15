@@ -133,7 +133,7 @@ fun BusStopCard(
                         }
                         Box(
                             modifier = Modifier
-                                .widthIn(max = 170.dp)
+                                .widthIn(max = 130.dp)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
                                     if (isPinned) MaterialTheme.colorScheme.surface
