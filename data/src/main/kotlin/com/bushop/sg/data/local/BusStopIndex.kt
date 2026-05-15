@@ -55,43 +55,89 @@ class BusStopIndex(private val context: Context) {
         _isReady.value = true
     }
 
+    /** Levenshtein distance for typo-tolerant matching (max 2 edits checked). */
+    private fun levenshtein(s1: String, s2: String, limit: Int = 2): Int {
+        if (kotlin.math.abs(s1.length - s2.length) > limit) return limit + 1
+        val dp = Array(s1.length + 1) { IntArray(s2.length + 1) }
+        for (i in 0..s1.length) dp[i][0] = i
+        for (j in 0..s2.length) dp[0][j] = j
+        for (i in 1..s1.length) {
+            for (j in 1..s2.length) {
+                val cost = if (s1[i - 1] == s2[j - 1]) 0 else 1
+                dp[i][j] = minOf(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost)
+            }
+            if (dp[i].min() > limit) return limit + 1  // early exit
+        }
+        return dp[s1.length][s2.length]
+    }
+
+    /** Tokenise a string into lowercase search tokens. */
+    private fun tokenise(text: String): List<String> =
+        text.lowercase().split(Regex("""[\s,./()&]+""")).filter { it.isNotEmpty() }
+
     /** Returns empty results if index hasn't loaded yet. */
     fun search(query: String): List<BusStopEntry> {
         val q = query.trim().lowercase()
         if (q.length < 1 || stops.isEmpty()) return emptyList()
 
-        // Fast path: pure digit queries — code prefix only
+        // Fast path: pure digit queries — code prefix matches first, then substring
         if (q.all { it.isDigit() }) {
-            return stops.values
-                .filter { it.code.startsWith(q) }
-                .take(20)
+            val prefix = stops.values.filter { it.code.startsWith(q) }
+            val rest = stops.values.filter { !it.code.startsWith(q) && it.code.contains(q) }
+            return (prefix + rest).take(20)
         }
 
-        // Scored relevance search for name/road queries
         data class Scored(val entry: BusStopEntry, val score: Int)
-        val queryWords = q.split(" ")
+        val queryTokens = q.split(Regex("""\s+""")).filter { it.length >= 2 }
+
         val results = stops.values.mapNotNull { entry ->
-            val nameLower = entry.name.lowercase()
-            val roadLower = entry.road.lowercase()
-            val score = when {
-                // Name starts with full query — excellent
-                nameLower.startsWith(q) -> 800
-                // Any word in name starts with full query — very good
-                nameLower.split(" ").any { it.startsWith(q) } -> 700
-                // Any word in name starts with any query word (min 2 chars) — good
-                queryWords.any { word -> word.length >= 2 && nameLower.split(" ").any { it.startsWith(word) } } -> 600
-                // All query words appear in name (substring) — decent
-                queryWords.all { it in nameLower } -> 500
-                // Any query word appears in name — fair
-                queryWords.any { it in nameLower } -> 300
-                // Any query word appears in road — weak
-                queryWords.any { it in roadLower } -> 200
-                // Name contains query as substring — fallback
-                q in nameLower -> 100
-                else -> null
-            }?.let { Scored(entry, it) }
-            score
+            val nameTokens = tokenise(entry.name)
+            val roadTokens = tokenise(entry.road)
+            var score = 0
+            var matchedAny = false
+
+            for (qt in queryTokens) {
+                var best = 0
+
+                // Check name tokens
+                for (nt in nameTokens) {
+                    val s = when {
+                        nt == qt -> 1000
+                        nt.startsWith(qt) -> 800
+                        qt.startsWith(nt) -> 600
+                        nt.contains(qt) -> 400
+                        qt.contains(nt) -> 300
+                        qt.length >= 4 && levenshtein(nt, qt) <= 1 -> 200
+                        else -> 0
+                    }
+                    if (s > best) best = s
+                }
+
+                // Check road tokens (lower weight)
+                for (rt in roadTokens) {
+                    val s = when {
+                        rt.startsWith(qt) -> 300
+                        rt.contains(qt) -> 150
+                        else -> 0
+                    }
+                    if (s > best) best = s
+                }
+
+                if (best > 0) {
+                    matchedAny = true
+                    score += best
+                }
+            }
+
+            // Bonus: all tokens matched
+            val allMatched = queryTokens.all { qt ->
+                nameTokens.any { nt -> nt.startsWith(qt) || nt.contains(qt) || qt.contains(nt) }
+            }
+            if (allMatched && queryTokens.isNotEmpty()) score += 500
+
+            if (matchedAny) Scored(entry, score) else null
         }
+
         return results
             .sortedByDescending { it.score }
             .take(20)
