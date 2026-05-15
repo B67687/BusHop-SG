@@ -63,6 +63,12 @@ class BusStopStorage(private val context: Context) {
         return result
     }
 
+    suspend fun reorderStops(reordered: List<BusStop>) {
+        context.dataStore.edit { prefs ->
+            prefs[busStopsKey] = gson.toJson(reordered)
+        }
+    }
+
     suspend fun removeBusStop(code: String) {
         context.dataStore.edit { prefs ->
             val json = prefs[busStopsKey] ?: "[]"

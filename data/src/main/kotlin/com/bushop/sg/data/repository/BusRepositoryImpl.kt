@@ -59,7 +59,10 @@ class BusRepositoryImpl(
 
     override suspend fun removeBusStop(code: String) {
         storage.removeBusStop(code)
-        storage.evictBusServices(code)
+    }
+
+    override suspend fun reorderStops(stops: List<BusStop>) {
+        storage.reorderStops(stops)
     }
 
     override suspend fun getBusArrivals(busStopCode: String): NetworkResult<List<BusService>> {

@@ -27,6 +27,12 @@ class BusStopIndex(private val context: Context) {
 
     init { /* empty — parsing is done in load() */ }
 
+    /** Test-only: inject stops without loading from assets. */
+    fun setTestData(testStops: List<BusStopEntry>) {
+        stops = testStops.associateBy { it.code }
+        _isReady.value = true
+    }
+
     /** Load and parse the JSON on [Dispatchers.IO]. Safe to call multiple times. */
     suspend fun load() {
         withContext(Dispatchers.IO) {
@@ -86,7 +92,6 @@ class BusStopIndex(private val context: Context) {
         val queryTokens = q.split(Regex("""\s+""")).filter { it.isNotEmpty() }
 
         val results = stops.values.mapNotNull { entry ->
-            val nameLower = entry.name.lowercase()
             val nameTokens = tokenise(entry.name)
             val roadTokens = tokenise(entry.road)
             val codeLower = entry.code.lowercase()
