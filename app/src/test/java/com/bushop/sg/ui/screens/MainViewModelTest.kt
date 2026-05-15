@@ -152,17 +152,17 @@ class MainViewModelTest {
     // ── Pin / Sort ──
 
     @Test
-    fun `togglePin sets isPinned flag without reordering`() = runTest(testDispatcher) {
+    fun `pinning moves stop to top of list`() = runTest(testDispatcher) {
         savedStopsFlow.value = listOf(BusStop("11111"), BusStop("22222"))
         advanceUntilIdle()
 
-        viewModel.togglePin("11111")
+        viewModel.togglePin("22222")
         advanceUntilIdle()
 
-        val stop = viewModel.savedStops.value.find { it.busStop.code == "11111" }
-        assertTrue("Stop should be pinned", stop?.isPinned ?: false)
-        // Order should be preserved (no reordering on pin)
-        assertEquals("11111", viewModel.savedStops.value.first().busStop.code)
+        val stops = viewModel.savedStops.value
+        assertTrue("Pinned stop should have isPinned=true", stops.first().isPinned)
+        assertEquals("Pinned stop should be at top", "22222", stops.first().busStop.code)
+        assertEquals("Unpinned stop should be second", "11111", stops[1].busStop.code)
     }
 
     @Test
@@ -172,7 +172,7 @@ class MainViewModelTest {
 
         viewModel.togglePin("11111")
         advanceUntilIdle()
-        assertTrue(viewModel.savedStops.value.find { it.busStop.code == "11111" }?.isPinned ?: false)
+        assertTrue(viewModel.savedStops.value.first().isPinned)
 
         viewModel.togglePin("11111")
         advanceUntilIdle()
@@ -183,24 +183,23 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `unpinning preserves original order`() = runTest(testDispatcher) {
-        // Pin is purely visual — order never changes
+    fun `unpinned stop returns to code-sorted order`() = runTest(testDispatcher) {
         savedStopsFlow.value = listOf(BusStop("11111"), BusStop("22222"), BusStop("33333"))
         advanceUntilIdle()
 
         viewModel.togglePin("33333")
         advanceUntilIdle()
-        assertTrue(viewModel.savedStops.value.last().isPinned)
+        assertEquals("33333", viewModel.savedStops.value.first().busStop.code)
 
         viewModel.togglePin("33333")
         advanceUntilIdle()
 
         val codes = viewModel.savedStops.value.map { it.busStop.code }
-        assertEquals("Order should be preserved after unpin", listOf("11111", "22222", "33333"), codes)
+        assertEquals("Order should be restored after unpin", listOf("11111", "22222", "33333"), codes)
     }
 
     @Test
-    fun `pinning multiple stops sets flags without reordering`() = runTest(testDispatcher) {
+    fun `pinning multiple stops keeps all pinned at top`() = runTest(testDispatcher) {
         savedStopsFlow.value = listOf(BusStop("11111"), BusStop("22222"), BusStop("33333"))
         advanceUntilIdle()
 
@@ -209,12 +208,11 @@ class MainViewModelTest {
         viewModel.togglePin("11111")
         advanceUntilIdle()
 
-        // Order is preserved — pinning is purely visual
         val codes = viewModel.savedStops.value.map { it.busStop.code }
-        assertEquals("Order should be preserved", listOf("11111", "22222", "33333"), codes)
-        assertTrue("First stop should be pinned", viewModel.savedStops.value[0].isPinned)
-        assertFalse("Middle stop should NOT be pinned", viewModel.savedStops.value[1].isPinned)
-        assertTrue("Last stop should be pinned", viewModel.savedStops.value[2].isPinned)
+        assertEquals("Two pinned stops should be at top", 2, codes.take(2).count { it in setOf("11111", "33333") })
+        assertEquals("Unpinned stop should be last", "22222", codes.last())
+        assertTrue("All pinned stops should have isPinned=true",
+            viewModel.savedStops.value.filter { it.isPinned }.size == 2)
     }
 
     // ── Per-service pinning ──

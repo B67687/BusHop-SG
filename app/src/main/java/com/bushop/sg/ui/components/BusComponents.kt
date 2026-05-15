@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.expandVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -49,18 +50,18 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.window.Popup
@@ -93,10 +94,11 @@ fun BusStopCard(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isPinned)
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                MaterialTheme.colorScheme.primaryContainer
             else
                 MaterialTheme.colorScheme.surface
         ),
+        border = if (isPinned) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -420,10 +422,13 @@ fun BusServiceRow(service: BusService, isPinned: Boolean = false, onTogglePinSer
                             )
                         }
                         if (showWabInfo) {
+                            LaunchedEffect(Unit) {
+                                kotlinx.coroutines.delay(3000)
+                                showWabInfo = false
+                            }
                             Popup(
-                                alignment = Alignment.CenterEnd,
-                                onDismissRequest = { showWabInfo = false },
-                                offset = IntOffset(8, 0)
+                                alignment = Alignment.TopCenter,
+                                onDismissRequest = { showWabInfo = false }
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
@@ -462,8 +467,7 @@ fun BusServiceRow(service: BusService, isPinned: Boolean = false, onTogglePinSer
                     Text(
                         text = arrival.busType,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 // Load row
@@ -484,8 +488,7 @@ fun BusServiceRow(service: BusService, isPinned: Boolean = false, onTogglePinSer
                     Text(
                         text = arrival.load,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
