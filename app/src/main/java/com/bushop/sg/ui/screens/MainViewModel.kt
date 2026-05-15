@@ -255,6 +255,23 @@ class MainViewModel(
         }
     }
 
+    fun moveStop(code: String, delta: Int) {
+        val list = _savedStops.value.toMutableList()
+        val fromIdx = list.indexOfFirst { it.busStop.code == code }
+        if (fromIdx == -1) return
+        val toIdx = (fromIdx + delta).coerceIn(0, list.lastIndex)
+        if (fromIdx == toIdx) return
+        val item = list.removeAt(fromIdx)
+        list.add(toIdx, item)
+        _savedStops.value = list
+        // Update addition order to match new position
+        additionOrder = list.map { it.busStop.code }
+        // Persist new order
+        viewModelScope.launch {
+            repository.reorderStops(list.map { it.busStop })
+        }
+    }
+
     private suspend fun refreshArrivalsInternal(code: String, isAutoRefresh: Boolean) {
         // Set loading state before API call (for manual refresh only)
         if (!isAutoRefresh) {
