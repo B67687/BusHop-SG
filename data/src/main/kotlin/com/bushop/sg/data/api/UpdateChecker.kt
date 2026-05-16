@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
 data class UpdateInfo(
@@ -43,6 +45,17 @@ class UpdateChecker {
         } catch (_: Exception) {
             null
         }
+    }
+
+    /** Download APK to local file. */
+    suspend fun downloadApk(url: String, targetFile: File): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url(url).build()
+            val response = client.newCall(request).execute()
+            val body = response.body ?: return@withContext false
+            FileOutputStream(targetFile).use { output -> body.byteStream().use { it.copyTo(output) } }
+            true
+        } catch (_: Exception) { false }
     }
 
     private fun isNewerVersion(tag: String, current: String): Boolean {

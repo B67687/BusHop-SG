@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Check
@@ -42,8 +43,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -55,6 +55,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -63,7 +65,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -157,7 +158,7 @@ private fun ApiStatusBanner(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val savedStops by viewModel.savedStops.collectAsState()
@@ -193,6 +194,16 @@ fun MainScreen(viewModel: MainViewModel) {
     val onThemeClick = remember { { viewModel.toggleThemeMode() } }
     val onRefreshClick = remember { { viewModel.refreshAll() } }
     val onSettingsClick = remember { { showSettings = true } }
+
+    // ── Nearby stops permission launcher ──
+    val nearbyLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { granted ->
+        if (granted.values.any { it }) {
+            viewModel.findNearbyStops()
+        }
+    }
+    var showNearbyDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -250,6 +261,15 @@ fun MainScreen(viewModel: MainViewModel) {
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Refresh",
                             tint = if (viewModel.isRefreshing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = {
+                        nearbyLauncher.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION))
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.MyLocation,
+                            contentDescription = "Nearby stops",
+                            tint = if (viewModel.nearbyStops.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(onClick = onSettingsClick) {
@@ -322,11 +342,9 @@ fun MainScreen(viewModel: MainViewModel) {
                             )
                         }
                     } else {
-                        val pullRefreshState = rememberPullToRefreshState()
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .nestedScroll(pullRefreshState.nestedScrollConnection)
+                        PullToRefreshBox(
+                            isRefreshing = viewModel.isRefreshing,
+                            onRefresh = { viewModel.refreshAll() }
                         ) {
                             LazyColumn(
                                 state = listState,
@@ -341,7 +359,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                     key = { it.busStop.code }
                                 ) { stopWithArrivals ->
                                     BusStopCard(
-                                        modifier = Modifier.animateItemPlacement(),
+                                        modifier = Modifier.animateItem(),
                                         stop = stopWithArrivals,
                                         onRefresh = { viewModel.refreshArrivals(stopWithArrivals.busStop.code) },
                                         onToggleCollapse = { viewModel.toggleCollapse(stopWithArrivals.busStop.code) },
@@ -358,25 +376,6 @@ fun MainScreen(viewModel: MainViewModel) {
                                         }
                                     )
                                 }
-                            }
-                            var hasTriggeredRefresh by remember { mutableStateOf(false) }
-                            if (pullRefreshState.isRefreshing && !hasTriggeredRefresh) {
-                                LaunchedEffect(pullRefreshState.isRefreshing) {
-                                    viewModel.refreshAll()
-                                    hasTriggeredRefresh = true
-                                }
-                            }
-                            if (!viewModel.isRefreshing && hasTriggeredRefresh && pullRefreshState.isRefreshing) {
-                                LaunchedEffect(viewModel.isRefreshing) {
-                                    pullRefreshState.endRefresh()
-                                    hasTriggeredRefresh = false
-                                }
-                            }
-                            if (pullRefreshState.isRefreshing || pullRefreshState.progress > 0f) {
-                                PullToRefreshContainer(
-                                    state = pullRefreshState,
-                                    modifier = Modifier.align(Alignment.TopCenter)
-                                )
                             }
                         }
                     }
@@ -420,6 +419,42 @@ fun MainScreen(viewModel: MainViewModel) {
         }  // close outer Box
     }  // close Scaffold content
 
+    // ── Nearby stops dialog ──
+    if (viewModel.nearbyStops.isNotEmpty() || viewModel.nearbyError != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearNearby() },
+            title = { Text("Nearby Stops") },
+            text = {
+                Column {
+                    if (viewModel.isLoadingNearby) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    } else if (viewModel.nearbyError != null) {
+                        Text(viewModel.nearbyError!!, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        Text("${viewModel.nearbyStops.size} stops within ~500m", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(8.dp))
+                        LazyColumn(modifier = Modifier.height(260.dp)) {
+                            items(viewModel.nearbyStops) { stop ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(stop.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                        Text(stop.road, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Text(stop.code, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewModel.clearNearby() }) { Text("OK") } }
+        )
+    }
+
     if (showSettings) {
         SettingsSheet(
             currentTheme = themeMode,
@@ -431,7 +466,9 @@ fun MainScreen(viewModel: MainViewModel) {
             },
             onCheckUpdate = { viewModel.checkForUpdate() },
             isCheckingUpdate = viewModel.isCheckingUpdate,
+            isDownloadingUpdate = viewModel.isDownloadingUpdate,
             updateInfo = viewModel.updateInfo,
+            onDownloadUpdate = { viewModel.downloadAndInstallUpdate() },
             onDismiss = { showSettings = false }
         )
     }
@@ -512,7 +549,9 @@ private fun SettingsSheet(
     onIntervalChange: (Int) -> Unit,
     onCheckUpdate: () -> Unit,
     isCheckingUpdate: Boolean,
+    isDownloadingUpdate: Boolean,
     updateInfo: UpdateInfo?,
+    onDownloadUpdate: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -573,6 +612,9 @@ private fun SettingsSheet(
                 if (updateInfo != null) {
                     Text("Update v${updateInfo.latestVersion} available", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(4.dp))
+                    TextButton(onClick = onDownloadUpdate, enabled = !isDownloadingUpdate) {
+                        Text(if (isDownloadingUpdate) "Downloading…" else "Download & Install")
+                    }
                 }
             }
         },
