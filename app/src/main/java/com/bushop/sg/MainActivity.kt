@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
             lifecycleScope.launch(Dispatchers.IO) { idx.load() }
         }
         val repository = BusRepositoryImpl(storage, dataSource, busStopIndex)
-        val viewModelFactory = MainViewModel.Factory(repository, busStopIndex)
+        val viewModelFactory = MainViewModel.Factory(application, repository, busStopIndex)
 
         setContent {
             val viewModel: MainViewModel = viewModel(factory = viewModelFactory)

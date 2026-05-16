@@ -5,6 +5,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlin.math.pow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
@@ -12,7 +13,9 @@ import kotlinx.coroutines.withContext
 data class BusStopEntry(
     val code: String,
     val name: String,
-    val road: String = ""
+    val road: String = "",
+    val lat: Double? = null,
+    val lng: Double? = null
 ) {
     val displayName: String get() = if (name.isNotBlank()) "$name, $road" else code
 }
@@ -53,7 +56,9 @@ class BusStopIndex(private val context: Context) {
                 if (data.size >= 3) {
                     val name = data[2].toString().trim()
                     val road = data.getOrNull(3)?.toString()?.trim() ?: ""
-                    if (name.isNotBlank()) BusStopEntry(code, name, road) else null
+                    val lat = data.getOrNull(1) as? Double
+                    val lng = data.getOrNull(0) as? Double
+                    if (name.isNotBlank()) BusStopEntry(code, name, road, lat, lng) else null
                 } else null
             }
             stops = parsed.associateBy { it.code }
@@ -157,4 +162,28 @@ class BusStopIndex(private val context: Context) {
 
     /** Returns null if index hasn't loaded yet. */
     fun findByCode(code: String): BusStopEntry? = stops[code]
+
+    /** Haversine distance in km between two lat/lng points. */
+    private fun haversineKm(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        val r = 6371.0
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLng = Math.toRadians(lng2 - lng1)
+        val a = kotlin.math.sin(dLat / 2).pow(2) +
+                kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+                kotlin.math.sin(dLng / 2).pow(2)
+        return r * 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+    }
+
+    /** Find nearby bus stops within [radiusKm] of [lat]/[lng], sorted by distance. */
+    fun findNearby(lat: Double, lng: Double, radiusKm: Double = 0.5): List<BusStopEntry> {
+        data class WithDist(val entry: BusStopEntry, val dist: Double)
+        return stops.values.mapNotNull { entry ->
+            entry.lat?.let { elat ->
+                entry.lng?.let { elng ->
+                    val dist = haversineKm(lat, lng, elat, elng)
+                    if (dist <= radiusKm) WithDist(entry, dist) else null
+                }
+            }
+        }.sortedBy { it.dist }.take(20).map { it.entry }
+    }
 }

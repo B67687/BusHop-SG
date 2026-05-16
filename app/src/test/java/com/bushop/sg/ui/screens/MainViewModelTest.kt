@@ -10,6 +10,7 @@ import com.bushop.sg.domain.model.DuplicateStopException
 import com.bushop.sg.domain.model.NetworkResult
 import com.bushop.sg.domain.model.ThemeMode
 import com.bushop.sg.domain.repository.BusRepository
+import android.app.Application
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -73,7 +74,7 @@ class MainViewModelTest {
             every { findByCode(any()) } returns null
         }
 
-        viewModel = MainViewModel(repository, busStopIndex)
+        viewModel = MainViewModel(mockk(relaxed = true), repository, busStopIndex)
     }
 
     @After
