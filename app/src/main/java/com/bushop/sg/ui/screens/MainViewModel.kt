@@ -3,6 +3,7 @@ package com.bushop.sg.ui.screens
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -32,17 +33,19 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
 import java.io.IOException
 
 /** Tracks the health of the external bus arrival API. */
 enum class ApiStatus { Healthy, Degraded, Down }
 
 class MainViewModel(
+    application: android.app.Application,
     private val repository: BusRepository,
     private val busStopIndex: BusStopIndex,
     private val useCase: BusStopUseCase = BusStopUseCase(),
     private val refreshCoordinator: StopRefreshCoordinator = StopRefreshCoordinator()
-) : ViewModel() {
+) : AndroidViewModel(application) {
 
     private var isAutoRefreshing = false
 
@@ -112,6 +115,52 @@ class MainViewModel(
 
     private var additionOrder: List<String> = emptyList()
 
+    // ── Nearby stops ──
+
+    var nearbyStops by mutableStateOf<List<BusStopEntry>>(emptyList())
+        private set
+    var isLoadingNearby by mutableStateOf(false)
+        private set
+    var nearbyError by mutableStateOf<String?>(null)
+        private set
+
+    fun clearNearby() {
+        nearbyStops = emptyList()
+        nearbyError = null
+    }
+
+    fun findNearbyStops() {
+        if (isLoadingNearby) return
+        isLoadingNearby = true
+        nearbyError = null
+        viewModelScope.launch {
+            try {
+                val ctx = getApplication<android.app.Application>()
+                val lm = ctx.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager
+                val providers = lm?.getProviders(true) ?: emptyList()
+                if (providers.isEmpty()) {
+                    nearbyError = "Location is disabled. Enable GPS or Wi-Fi scanning."
+                    return@launch
+                }
+                val location = providers.firstNotNullOfOrNull { lm?.getLastKnownLocation(it) }
+                if (location == null) {
+                    nearbyError = "Could not get current location. Try again later."
+                    return@launch
+                }
+                nearbyStops = busStopIndex.findNearby(location.latitude, location.longitude)
+                if (nearbyStops.isEmpty()) {
+                    nearbyError = "No bus stops found nearby."
+                }
+            } catch (e: SecurityException) {
+                nearbyError = "Location permission denied."
+            } catch (e: Exception) {
+                nearbyError = "Error: ${e.message}"
+            } finally {
+                isLoadingNearby = false
+            }
+        }
+    }
+
     // ── Update checker ──
 
     var updateInfo by mutableStateOf<UpdateInfo?>(null)
@@ -137,6 +186,40 @@ class MainViewModel(
                 }
             } finally {
                 isCheckingUpdate = false
+            }
+        }
+    }
+
+    /** Download the latest APK and launch the install intent via FileProvider. */
+    fun downloadAndInstallUpdate() {
+        val info = updateInfo ?: return
+        if (isDownloadingUpdate) return
+        isDownloadingUpdate = true
+        downloadProgress = 0f
+        viewModelScope.launch {
+            try {
+                val targetFile = File(getApplication<android.app.Application>().cacheDir, "bus-hop-update.apk")
+                val success = updateChecker.downloadApk(info.downloadUrl, targetFile)
+                if (success) {
+                    val apkUri = androidx.core.content.FileProvider.getUriForFile(
+                        getApplication(),
+                        "${getApplication<android.app.Application>().packageName}.fileprovider",
+                        targetFile
+                    )
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                        setDataAndType(apkUri, "application/vnd.android.package-archive")
+                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    }
+                    getApplication<android.app.Application>().startActivity(intent)
+                    _snackbarMessage.tryEmit("Installing v${info.latestVersion}…")
+                } else {
+                    _snackbarMessage.tryEmit("Download failed")
+                }
+            } catch (e: Exception) {
+                _snackbarMessage.tryEmit("Install failed: ${e.message}")
+            } finally {
+                isDownloadingUpdate = false
             }
         }
     }
@@ -495,12 +578,13 @@ class MainViewModel(
     }
 
     class Factory(
+        private val application: android.app.Application,
         private val repository: BusRepository,
         private val busStopIndex: BusStopIndex
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return MainViewModel(repository, busStopIndex) as T
+            return MainViewModel(application, repository, busStopIndex) as T
         }
     }
 }
