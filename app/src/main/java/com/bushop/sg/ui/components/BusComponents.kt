@@ -62,8 +62,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.zIndex
+
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -123,23 +124,27 @@ fun BusStopCard(
             ),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (isPinned) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surface
         ),
         border = if (isPinned) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         elevation = CardDefaults.cardElevation(defaultElevation = if (visuallyDragged) 12.dp else 3.dp)
     ) {
     Column {
-            // ── Blue header (full width, no side padding) ──
+            // ── Header background (pinned = blue pill, unpinned = none) ──
+            val isTapTarget = onMoveStop == null
             Row(
-                modifier = Modifier
+                modifier = (if (isPinned) Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.primaryContainer)
+                else Modifier.fillMaxWidth())
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
                     .pointerInput(onToggleCollapse, onDelete, onMoveStop) {
                         detectTapGestures(
                             onTap = { onToggleCollapse() },
                             onLongPress = {
-                                if (onMoveStop == null) {
+                                if (isTapTarget) {
                                     onDelete()
                                 }
                             }
@@ -161,6 +166,13 @@ fun BusStopCard(
                                     change.consume()
                                     totalY += dragAmount.y
                                     localDragOffset = totalY
+                                    // Mid-gesture swap at each card boundary
+                                    while (kotlin.math.abs(totalY) >= itemHeightPx) {
+                                        val dir = if (totalY > 0) 1 else -1
+                                        onMoveStop!!(dir)
+                                        totalY -= dir * itemHeightPx
+                                        localDragOffset = totalY
+                                    }
                                 },
                                 onDragEnd = {
                                     isLocallyDragged = false
@@ -176,8 +188,7 @@ fun BusStopCard(
                                 }
                             )
                         } else Modifier
-                    )
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -193,11 +204,13 @@ fun BusStopCard(
                                 else -> nameTextStyle.fontSize
                             }
                         }
+                        val namePillBg = if (isPinned) MaterialTheme.colorScheme.primary
+                                         else MaterialTheme.colorScheme.primaryContainer
                         Box(
                             modifier = Modifier
                                 .widthIn(max = 130.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.primary)
+                                .background(namePillBg)
                                 .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Text(
@@ -205,7 +218,8 @@ fun BusStopCard(
                                 fontSize = dynamicFontSize,
                                 style = nameTextStyle.copy(fontSize = dynamicFontSize),
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary,
+                                color = if (isPinned) MaterialTheme.colorScheme.onPrimary
+                                       else MaterialTheme.colorScheme.onPrimaryContainer,
                                 maxLines = 3
                             )
                         }
@@ -259,16 +273,12 @@ fun BusStopCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                        imageVector = if (effectiveCollapsed) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
-                        contentDescription = if (effectiveCollapsed) "Expand" else "Collapse",
+                            imageVector = if (effectiveCollapsed) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
+                            contentDescription = if (effectiveCollapsed) "Expand" else "Collapse",
                             modifier = Modifier.size(18.dp)
                         )
                     }
                 }
-            }
-            // Blue drop indicator
-            if (isLocallyDragged && kotlin.math.abs(localDragOffset) > 20) {
-                Box(Modifier.fillMaxWidth().height(3.dp).background(MaterialTheme.colorScheme.primary))
             }
 
             val easing = FastOutSlowInEasing
