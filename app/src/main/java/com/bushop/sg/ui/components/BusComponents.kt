@@ -149,10 +149,12 @@ fun BusStopCard(
                     .then(
                         if (onMoveStop != null) Modifier.pointerInput(onMoveStop) {
                             var totalY = 0f
-                            val itemHeightPx = with(dragDensity) { 140.dp.toPx() }
+                            var swapCount = 0
+                            val swapThresh = with(dragDensity) { 60.dp.toPx() }
                             detectDragGesturesAfterLongPress(
                                 onDragStart = {
                                     totalY = 0f
+                                    swapCount = 0
                                     isLocallyDragged = true
                                     localDragOffset = 0f
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -161,12 +163,13 @@ fun BusStopCard(
                                     change.consume()
                                     totalY += dragAmount.y
                                     localDragOffset = totalY
+                                    val nextThresh = swapThresh * (swapCount + 1)
+                                    if (totalY < -nextThresh) { onMoveStop!!(-1); swapCount++ }
+                                    else if (totalY > nextThresh) { onMoveStop!!(1); swapCount++ }
                                 },
                                 onDragEnd = {
                                     isLocallyDragged = false
                                     localDragOffset = 0f
-                                    val delta = (totalY / itemHeightPx).toInt()
-                                    if (delta != 0) onMoveStop!!(delta)
                                 },
                                 onDragCancel = {
                                     isLocallyDragged = false
