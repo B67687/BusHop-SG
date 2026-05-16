@@ -103,6 +103,7 @@ fun BusStopCard(
     val isCollapsed = stop.isCollapsed
     val isPinned = stop.isPinned
     val haptic = LocalHapticFeedback.current
+    val dragDensity = LocalDensity.current
     var localDragOffset by remember { mutableStateOf(0f) }
     var isLocallyDragged by remember { mutableStateOf(false) }
     val visuallyDragged = isDragged || isLocallyDragged
@@ -145,6 +146,9 @@ fun BusStopCard(
                     .then(
                         if (onMoveStop != null) Modifier.pointerInput(onMoveStop) {
                             var totalY = 0f
+                            // Approximate item height: 140dp → pixels at current density.
+                            // Used to convert free-drag totalY into a position delta on drop.
+                            val itemHeightPx = with(dragDensity) { 140.dp.toPx() }
                             detectDragGesturesAfterLongPress(
                                 onDragStart = {
                                     totalY = 0f
@@ -155,18 +159,13 @@ fun BusStopCard(
                                 onDrag = { change, dragAmount ->
                                     change.consume()
                                     totalY += dragAmount.y
-                                    localDragOffset = totalY
-                                    if (totalY < -120) {
-                                        onMoveStop!!(-1)
-                                        totalY = 0f
-                                    } else if (totalY > 120) {
-                                        onMoveStop!!(1)
-                                        totalY = 0f
-                                    }
+                                    localDragOffset = totalY  // free follow — no threshold snap
                                 },
                                 onDragEnd = {
                                     isLocallyDragged = false
                                     localDragOffset = 0f
+                                    val delta = (totalY / itemHeightPx).toInt()
+                                    if (delta != 0) onMoveStop!!(delta)
                                 },
                                 onDragCancel = {
                                     isLocallyDragged = false

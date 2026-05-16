@@ -1,57 +1,68 @@
 #!/usr/bin/env bash
 # ── BusHop release script ──
-# Usage: ./scripts/release.sh [patch|minor]
-# Steps: clean build → verify APK → commit → tag → push → create GitHub Release → upload APK
+# Usage: ./scripts/release.sh [VERSION]
+# Steps: bump version → clean build → tests → APK verify → commit → tag → push → release
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-VERSION=$(grep versionName app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-TAG="v$VERSION"
-APK_PATH="app/build/outputs/apk/debug/bus-hop.apk"
+BKC="app/build.gradle.kts"
 
-echo "═══ Building BusHop v$VERSION ═══"
+# Read current version
+CURRENT=$(grep versionName "$BKC" | sed 's/.*"\(.*\)".*/\1/')
+echo "Current version: v$CURRENT"
 
-# 1. Clean build with APK verification
-./gradlew clean checkAndRenameDebugApk
-
-# 2. Verify APK exists and has proper size
-if [ ! -f "$APK_PATH" ]; then
-    echo "❌ APK not found at $APK_PATH"
-    exit 1
+# Use provided version or bump patch
+NEW="${1:-}"
+if [ -z "$NEW" ]; then
+	IFS='.' read -r -a PARTS <<<"$CURRENT"
+	NEW="${PARTS[0]}.${PARTS[1]}.$((${PARTS[2]:-0} + 1))"
+	echo "No version given — bumping to v$NEW"
 fi
+
+CODE=$(grep versionCode "$BKC" | sed 's/.*versionCode\s*=\s*\([0-9]*\).*/\1/')
+NEXT_CODE=$((CODE + 1))
+
+# 1. Bump version in build.gradle.kts
+sed -i "s/versionCode = $CODE/versionCode = $NEXT_CODE/" "$BKC"
+sed -i "s/versionName = \"$CURRENT\"/versionName = \"$NEW\"/" "$BKC"
+
+VERSION="$NEW"
+TAG="v$VERSION"
+echo "═══ Building BusHop v$VERSION (code $NEXT_CODE) ═══"
+
+# 2. Verify versionName matches tag (regression check)
+CHECK=$(grep versionName "$BKC" | sed 's/.*"\(.*\)".*/\1/')
+if [ "$CHECK" != "$VERSION" ]; then
+	echo "❌ Version mismatch: build.gradle.kts says $CHECK, expected $VERSION"
+	exit 1
+fi
+
+# 3. Clean build with tests + APK verification
+./gradlew clean test checkAndRenameDebugApk
+
+APK_PATH="app/build/outputs/apk/debug/bus-hop.apk"
 APK_SIZE=$(stat -c%s "$APK_PATH" 2>/dev/null || stat -f%z "$APK_PATH" 2>/dev/null)
 if [ "$APK_SIZE" -lt 1000000 ]; then
-    echo "❌ APK suspiciously small (${APK_SIZE} bytes) — aborting"
-    exit 1
+	echo "❌ APK suspiciously small (${APK_SIZE} bytes) — aborting"
+	exit 1
 fi
-echo "✅ APK verified: $APK_PATH ($(( APK_SIZE / 1024 )) KB)"
+echo "✅ Tests passed, APK verified: $((APK_SIZE / 1024)) KB"
 
-# 3. Check for existing tag
-if git rev-parse "$TAG" >/dev/null 2>&1; then
-    echo "⚠️  Tag $TAG already exists locally"
-    read -rp "Delete existing tag and release? (y/N) " confirm
-    if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-        gh release delete "$TAG" --yes 2>/dev/null || true
-        git tag -d "$TAG" 2>/dev/null || true
-        git push origin --delete "$TAG" 2>/dev/null || true
-    else
-        echo "Aborted."
-        exit 1
-    fi
-fi
+# 4. Commit the version bump (only build.gradle.kts change)
+git add "$BKC"
+git commit -m "Bump to v$VERSION"
+git push
 
-# 4. Commit, tag, push
-git add -A
-git commit -m "$TAG: release"
+# 5. Tag and push
 git tag "$TAG"
-git push origin master --tags
+git push origin main --tags
 
-# 5. Create GitHub Release and upload APK
+# 6. Create GitHub Release and upload APK
 gh release create "$TAG" \
-    --title "$TAG" \
-    --notes "See commits for details." \
-    --verify-tag \
-    --latest
+	--title "$TAG" \
+	--notes "See commits for details." \
+	--verify-tag \
+	--latest
 
 gh release upload "$TAG" "$APK_PATH" --clobber
 
