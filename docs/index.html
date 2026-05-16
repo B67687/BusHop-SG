@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BusHop-SG - Traffic Dashboard</title>
+    <title id="page-title">Repo - Traffic Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
             onerror="document.getElementById('chart-fallback').classList.remove('hidden')"></script>
@@ -527,11 +527,11 @@
 <body>
     <div class="container">
         <header>
-            <a href="https://github.com/B67687/agentic-workflows" class="banner-link">
+            <a id="banner-link" href="#" class="banner-link">
                 <p class="banner-title">GitHub Traffic Tracker</p>
                 <p class="banner-arrow">View repository &rarr;</p>
             </a>
-            <h1><a href="https://github.com/B67687/BusHop-SG" class="ghtraf-heading">BusHop-SG</a> — Traffic Dashboard</h1>
+            <h1><a id="heading-link" href="#" class="ghtraf-heading">Repo</a> — Traffic Dashboard</h1>
             <p class="subtitle">Downloads, clones, views, and community insights</p>
         </header>
 
@@ -919,8 +919,8 @@
                 <div class="footer-text">
                     <p>Data updates daily at 3:00 AM UTC &middot; Last data point: <span id="last-updated">--</span></p>
                     <p>
-                        <a href="https://github.com/B67687/agentic-workflows">Repository</a> &middot;
-                        <a href="https://github.com/B67687/agentic-workflows/releases">Releases</a>
+                        <a id="footer-repo-link" href="#">Repository</a> &middot;
+                        <a id="footer-releases-link" href="#">Releases</a>
                     </p>
                     <p style="margin-top: 0.8rem; font-size: 0.8rem; font-weight: 600;">
                         Dashboard by <a href="https://docs.github.com/en/rest/metrics/traffic">GitHub Traffic API</a>
@@ -942,21 +942,46 @@
     </div>
 
     <script>
-        // Configuration
-        const GIST_RAW_BASE = 'https://gist.githubusercontent.com/B67687/4845d76fc7e704afce78c827650bd0ce/raw';
-
-        const STATE_URL = GIST_RAW_BASE + '/state.json';
-
-        const ARCHIVE_GIST_ID = '970b347241f8c1aae210879272fd0dde';
-
-        const ARCHIVE_API_URL = 'https://api.github.com/gists/' + ARCHIVE_GIST_ID;
-
+        // ── Auto-detect repo from page URL ──────────────────────────
+        // /RepoName/ or /RepoName/something/  →  "RepoName"
+        const REPO_NAME = window.location.pathname.split('/')[1] || 'agentic-workflows';
         const REPO_OWNER = 'B67687';
 
-        const REPO_NAME = 'BusHop-SG';
+        // ── Per-repo config: gist IDs + creation date ───────────────
+        const REPO_CONFIG = {
+            'agentic-workflows':   { gist: 'fed5bb761c0f8fa03776d33187d49435', archive: 'f1dc20af7d472b6a97eff88a7b4de3c4', created: '2026-05-13' },
+            'BusHop-SG':           { gist: '4845d76fc7e704afce78c827650bd0ce', archive: '970b347241f8c1aae210879272fd0dde', created: '2026-04-15' },
+            'ScenicFetch':         { gist: '41c4142c68a816251f3466ba57db0967', archive: 'aa56b392f8b98edf5ec2acd78a9118d7', created: '2026-04-10' },
+            'MathLearningNotes':   { gist: '432884d28bd91aefb9574eb105f57629', archive: '18aa3be3cc458ee9e8c38e740052c0ba', created: '2025-03-01' },
+            'PythonLearningNotes': { gist: '3681a13789d9a7551c0998945dd5804e', archive: '914821dfe554ac844a3dec8dcaf1bfaa', created: '2025-02-28' },
+            'H2-Computing':        { gist: '317f06538a932f7500de35291c6fe756', archive: '98867db4848c473ee24d376119a0eed9', created: '2024-05-07' },
+            'CS50p-2022':          { gist: '341d02627e895660ef55727d5473e01d', archive: 'ed7f4608a7d7b007888064199c9bfb22', created: '2024-05-07' },
+            'Password-Generator':  { gist: '343b148a4ffd56d1af061f36b2f63f2b', archive: 'a4c490f6a1a4d7dfbd327071e180452b', created: '2024-04-13' },
+        };
+        const cfg = REPO_CONFIG[REPO_NAME];
+        if (!cfg) { document.body.innerHTML = '<p style="color:red;padding:2rem">Unknown repo: ' + REPO_NAME + '</p>'; throw new Error('Unknown repo'); }
 
-        const REPO_CREATED = '2026-04-15'; // for project age calculation
+        const GIST_RAW_BASE = 'https://gist.githubusercontent.com/' + REPO_OWNER + '/' + cfg.gist + '/raw';
+        const STATE_URL = GIST_RAW_BASE + '/state.json';
+        const ARCHIVE_GIST_ID = cfg.archive;
+        const ARCHIVE_API_URL = 'https://api.github.com/gists/' + ARCHIVE_GIST_ID;
+        const REPO_CREATED = cfg.created;
+
         var primaryAuthor = null; // resolved from contributors API (org-owned repos have owner=org, not committer)
+
+        // ── Populate HTML elements with dynamic repo info ──────────
+        (function() {
+            var repoUrl = 'https://github.com/' + REPO_OWNER + '/' + REPO_NAME;
+            document.title = REPO_NAME + ' — Traffic Dashboard';
+            var bl = document.getElementById('banner-link');
+            if (bl) { bl.href = repoUrl; }
+            var hl = document.getElementById('heading-link');
+            if (hl) { hl.href = repoUrl; hl.textContent = REPO_NAME; }
+            var frl = document.getElementById('footer-repo-link');
+            if (frl) { frl.href = repoUrl; }
+            var frls = document.getElementById('footer-releases-link');
+            if (frls) { frls.href = repoUrl + '/releases'; }
+        })();
 
         // State
         let currentState = null;
