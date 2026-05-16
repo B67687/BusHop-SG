@@ -1,0 +1,28 @@
+config:
+  validation: true
+  warningsAsErrors: false
+  excludes: ["**/build/**", "**/test/**", "**/androidTest/**"]
+
+style:
+  UnusedImport:
+    active: true
+  WildcardImport:
+    active: false
+  MaxLineLength:
+    active: true
+    maxLineLength: 150
+    excludePackageStatements: true
+
+potential-bugs:
+  UnsafeCast:
+    active: true
+  UnreachableCode:
+    active: true
+
+performance:
+  SpreadOperator:
+    active: true
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
