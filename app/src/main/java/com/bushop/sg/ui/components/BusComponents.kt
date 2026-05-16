@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.filled.Chair
 import androidx.compose.material.icons.filled.DirectionsBus
@@ -40,8 +41,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.PushPin
@@ -70,6 +69,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.window.Popup
 import com.bushop.sg.domain.model.BusService
 import com.bushop.sg.domain.model.BusStopWithArrivals
@@ -85,7 +86,7 @@ fun BusStopCard(
     onDelete: () -> Unit,
     onTogglePinService: (String) -> Unit,
     pinnedServiceNos: Set<String> = emptySet(),
-    onMoveStop: ((Int) -> Unit)? = null,
+    onMoveStop: ((Int) -> Unit)? = null,  // drag-to-reorder: called with delta (-1 up, +1 down)
     modifier: Modifier = Modifier
 ) {
     val busStopCode = stop.busStop.code
@@ -108,16 +109,46 @@ fun BusStopCard(
         border = if (isPinned) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        val haptic = LocalHapticFeedback.current
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .pointerInput(onToggleCollapse, onDelete) {
+                    .pointerInput(onToggleCollapse, onDelete, onMoveStop) {
                         detectTapGestures(
                             onTap = { onToggleCollapse() },
-                            onLongPress = { onDelete() }
+                            onLongPress = {
+                                if (onMoveStop == null) {
+                                    onDelete()
+                                }
+                                // If onMoveStop is non-null, long press starts drag-to-reorder
+                            }
                         )
                     }
+                    .then(
+                        if (onMoveStop != null) Modifier.pointerInput(onMoveStop) {
+                            var totalY = 0f
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    totalY = 0f
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    totalY += dragAmount.y
+                                    if (totalY < -120) {
+                                        onMoveStop?.invoke(-1)
+                                        totalY = 0f
+                                    } else if (totalY > 120) {
+                                        onMoveStop?.invoke(1)
+                                        totalY = 0f
+                                    }
+                                },
+                                onDragEnd = { },
+                                onDragCancel = { }
+                            )
+                        } else Modifier
+                    )
                     .padding(top = 12.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -193,20 +224,6 @@ fun BusStopCard(
                             modifier = Modifier.size(12.dp),
                             tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                    if (onMoveStop != null) {
-                        Box(
-                            modifier = Modifier.size(20.dp).clickable { onMoveStop(-1) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move up", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Box(
-                            modifier = Modifier.size(20.dp).clickable { onMoveStop(1) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move down", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
                     }
                     Box(
                         modifier = Modifier

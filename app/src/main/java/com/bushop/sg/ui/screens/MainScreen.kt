@@ -350,7 +350,10 @@ fun MainScreen(viewModel: MainViewModel) {
                                         },
                                         pinnedServiceNos = pinnedServices
                                             .filter { it.startsWith("${stopWithArrivals.busStop.code}:") }
-                                            .map { it.substringAfter(":") }.toSet()
+                                            .map { it.substringAfter(":") }.toSet(),
+                                        onMoveStop = { delta ->
+                                            viewModel.moveStop(stopWithArrivals.busStop.code, delta)
+                                        }
                                     )
                                 }
                             }
