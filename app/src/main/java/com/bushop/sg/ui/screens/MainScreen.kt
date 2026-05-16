@@ -63,6 +63,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,6 +72,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.bushop.sg.data.api.UpdateInfo
 import com.bushop.sg.data.local.BusStopEntry
 import com.bushop.sg.domain.model.ThemeMode
 import com.bushop.sg.ui.components.AddBusStopDialog
@@ -155,7 +157,7 @@ private fun ApiStatusBanner(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val savedStops by viewModel.savedStops.collectAsState()
@@ -339,6 +341,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                     key = { it.busStop.code }
                                 ) { stopWithArrivals ->
                                     BusStopCard(
+                                        modifier = Modifier.animateItemPlacement(),
                                         stop = stopWithArrivals,
                                         onRefresh = { viewModel.refreshArrivals(stopWithArrivals.busStop.code) },
                                         onToggleCollapse = { viewModel.toggleCollapse(stopWithArrivals.busStop.code) },
@@ -426,6 +429,9 @@ fun MainScreen(viewModel: MainViewModel) {
                 viewModel.setAutoRefreshInterval(seconds)
                 showSettings = false
             },
+            onCheckUpdate = { viewModel.checkForUpdate() },
+            isCheckingUpdate = viewModel.isCheckingUpdate,
+            updateInfo = viewModel.updateInfo,
             onDismiss = { showSettings = false }
         )
     }
@@ -504,6 +510,9 @@ private fun SettingsSheet(
     currentInterval: Int,
     onThemeChange: (ThemeMode) -> Unit,
     onIntervalChange: (Int) -> Unit,
+    onCheckUpdate: () -> Unit,
+    isCheckingUpdate: Boolean,
+    updateInfo: UpdateInfo?,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -551,11 +560,20 @@ private fun SettingsSheet(
                     Text("Operator badge logo", style = MaterialTheme.typography.bodySmall)
                 }
                 Spacer(modifier = Modifier.height(16.dp))
+                Text("Updates", style = MaterialTheme.typography.titleSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "v${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                TextButton(onClick = onCheckUpdate, enabled = !isCheckingUpdate) {
+                    Text(if (isCheckingUpdate) "Checking…" else "Check for updates")
+                }
+                if (updateInfo != null) {
+                    Text("Update v${updateInfo.latestVersion} available", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } }

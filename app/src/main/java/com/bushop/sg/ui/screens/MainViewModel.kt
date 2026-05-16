@@ -9,6 +9,9 @@ import androidx.lifecycle.viewModelScope
 import com.bushop.sg.data.local.BusStopEntry
 import com.bushop.sg.data.local.BusStopIndex
 import com.bushop.sg.domain.model.DuplicateStopException
+import com.bushop.sg.BuildConfig
+import com.bushop.sg.data.api.UpdateChecker
+import com.bushop.sg.data.api.UpdateInfo
 import com.bushop.sg.domain.model.BusStop
 import com.bushop.sg.domain.model.BusStopWithArrivals
 import com.bushop.sg.domain.model.NetworkResult
@@ -108,6 +111,35 @@ class MainViewModel(
     val searchResults: StateFlow<List<BusStopEntry>> = _searchResults.asStateFlow()
 
     private var additionOrder: List<String> = emptyList()
+
+    // ── Update checker ──
+
+    var updateInfo by mutableStateOf<UpdateInfo?>(null)
+        private set
+    var isCheckingUpdate by mutableStateOf(false)
+        private set
+    var isDownloadingUpdate by mutableStateOf(false)
+        private set
+    var downloadProgress by mutableStateOf(0f)
+        private set
+
+    private val updateChecker = UpdateChecker()
+
+    fun checkForUpdate() {
+        if (isCheckingUpdate) return
+        isCheckingUpdate = true
+        viewModelScope.launch {
+            try {
+                val info = updateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
+                updateInfo = info
+                if (info != null && info.hasUpdate) {
+                    _snackbarMessage.tryEmit("Update v${info.latestVersion} available")
+                }
+            } finally {
+                isCheckingUpdate = false
+            }
+        }
+    }
 
     init {
         // Restore persisted preferences
