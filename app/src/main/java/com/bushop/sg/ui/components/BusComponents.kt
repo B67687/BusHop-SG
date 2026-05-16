@@ -121,17 +121,16 @@ fun BusStopCard(
             ),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isPinned)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = if (isPinned) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+        border = if (isPinned) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         elevation = CardDefaults.cardElevation(defaultElevation = if (visuallyDragged) 12.dp else 3.dp)
     ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-            // Blue drop indicator when dragging (shows where item will land)
-            if (isLocallyDragged && localDragOffset < -20) {
+            // Blue accent bar at top of card
+            Box(Modifier.fillMaxWidth().height(2.dp).background(MaterialTheme.colorScheme.primary))
+            // Blue drop indicator when dragging
+            if (isLocallyDragged && kotlin.math.abs(localDragOffset) > 20) {
                 Box(Modifier.fillMaxWidth().height(3.dp).background(MaterialTheme.colorScheme.primary))
             }
             Row(
@@ -150,12 +149,10 @@ fun BusStopCard(
                     .then(
                         if (onMoveStop != null) Modifier.pointerInput(onMoveStop) {
                             var totalY = 0f
-                            var swapCount = 0
-                            val swapThreshold = with(dragDensity) { 60.dp.toPx() }
+                            val itemHeightPx = with(dragDensity) { 140.dp.toPx() }
                             detectDragGesturesAfterLongPress(
                                 onDragStart = {
                                     totalY = 0f
-                                    swapCount = 0
                                     isLocallyDragged = true
                                     localDragOffset = 0f
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -164,17 +161,12 @@ fun BusStopCard(
                                     change.consume()
                                     totalY += dragAmount.y
                                     localDragOffset = totalY
-                                    if (totalY < -swapThreshold * (swapCount + 1)) {
-                                        onMoveStop!!(-1)
-                                        swapCount++
-                                    } else if (totalY > swapThreshold * (swapCount + 1)) {
-                                        onMoveStop!!(1)
-                                        swapCount++
-                                    }
                                 },
                                 onDragEnd = {
                                     isLocallyDragged = false
                                     localDragOffset = 0f
+                                    val delta = (totalY / itemHeightPx).toInt()
+                                    if (delta != 0) onMoveStop!!(delta)
                                 },
                                 onDragCancel = {
                                     isLocallyDragged = false
@@ -203,10 +195,7 @@ fun BusStopCard(
                             modifier = Modifier
                                 .widthIn(max = 130.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    if (isPinned) MaterialTheme.colorScheme.surface
-                                    else MaterialTheme.colorScheme.primaryContainer
-                                )
+                                .background(MaterialTheme.colorScheme.primaryContainer)
                                 .padding(horizontal = 14.dp, vertical = 8.dp)
                         ) {
                             Text(
