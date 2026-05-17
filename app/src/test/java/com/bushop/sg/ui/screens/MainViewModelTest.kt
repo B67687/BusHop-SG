@@ -6,12 +6,12 @@ import com.bushop.sg.data.local.BusStopIndex
 import com.bushop.sg.domain.model.BusInfo
 import com.bushop.sg.domain.model.BusService
 import com.bushop.sg.domain.model.BusStop
+import com.bushop.sg.domain.model.ColorSchemeOption
 import com.bushop.sg.domain.model.DuplicateStopException
 import com.bushop.sg.domain.model.NetworkResult
 import com.bushop.sg.domain.model.ThemeMode
 import com.bushop.sg.domain.repository.BusRepository
 import android.app.Application
-import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -48,6 +48,7 @@ class MainViewModelTest {
     private val collapsedStopsSetFlow = MutableStateFlow<Set<String>>(emptySet())
     private val cachedTimestampsFlow = MutableStateFlow<Map<String, Long>>(emptyMap())
     private val pinnedServicesStateFlow = MutableStateFlow<Set<String>>(emptySet())
+    private val colorSchemeFlow = MutableStateFlow(ColorSchemeOption.BLUE)
 
     @Before
     fun setUp() {
@@ -59,12 +60,16 @@ class MainViewModelTest {
             every { cachedTimestamps } returns cachedTimestampsFlow
             every { collapsedStopsFlow } returns collapsedStopsSetFlow
             every { pinnedServicesFlow } returns pinnedServicesStateFlow
+            every { colorSchemeOptionFlow } returns colorSchemeFlow
             coEvery { getAutoRefreshIntervalOnce() } returns 0
             coEvery { addBusStop(any()) } returns Result.success(Unit)
             coEvery { removeBusStop(any()) } returns Unit
             coEvery { getBusArrivals(any()) } returns NetworkResult.Success(emptyList())
             coEvery { setCollapsedStops(any<Set<String>>()) } answers {
                 collapsedStopsSetFlow.value = firstArg()
+            }
+            coEvery { setColorSchemeOption(any<ColorSchemeOption>()) } answers {
+                colorSchemeFlow.value = firstArg()
             }
             coEvery { setThemeMode(any<ThemeMode>()) } answers { }
         }
@@ -115,6 +120,17 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `addBusStop handles thrown verification exception gracefully`() = runTest(testDispatcher) {
+        coEvery { repository.getBusArrivals("12345") } throws IllegalStateException("boom")
+
+        viewModel.addBusStop("12345")
+        advanceUntilIdle()
+
+        assertFalse(viewModel.addStopIsLoading)
+        assertTrue(viewModel.addStopError?.contains("boom") == true)
+    }
+
+    @Test
     fun `addBusStop with empty services shows error`() = runTest(testDispatcher) {
         coEvery { repository.getBusArrivals("12345") } returns NetworkResult.Success(emptyList())
 
@@ -133,6 +149,22 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertFalse("Loading should be cleared after completion", viewModel.addStopIsLoading)
+    }
+
+    @Test
+    fun `addBusStop defaults new stop to collapsed`() = runTest(testDispatcher) {
+        val busService = BusService("167", "SBST", next = null, subsequent = null, next3 = null)
+        coEvery { repository.getBusArrivals("12345") } returns NetworkResult.Success(listOf(busService))
+        coEvery { repository.addBusStop(any()) } answers {
+            savedStopsFlow.value = listOf(BusStop("12345"))
+            Result.success(Unit)
+        }
+
+        viewModel.addBusStop("12345")
+        advanceUntilIdle()
+
+        assertTrue(viewModel.savedStops.value.first().isCollapsed)
+        assertTrue(collapsedStopsSetFlow.value.contains("12345"))
     }
 
     // ── Removing stops ──
@@ -431,6 +463,22 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `refreshAll handles thrown repository exception gracefully`() = runTest(testDispatcher) {
+        savedStopsFlow.value = listOf(BusStop("12345"))
+        advanceUntilIdle()
+
+        coEvery { repository.getBusArrivals("12345") } throws IllegalStateException("crash")
+
+        viewModel.refreshAll(isAutoRefresh = false)
+        advanceUntilIdle()
+
+        val stop = viewModel.savedStops.value.find { it.busStop.code == "12345" }
+        assertNotNull(stop)
+        assertFalse(stop?.isLoading ?: true)
+        assertFalse(viewModel.isRefreshing)
+    }
+
+    @Test
     fun `autoRefresh handles network failure without showing error`() = runTest(testDispatcher) {
         savedStopsFlow.value = listOf(BusStop("12345"))
         advanceUntilIdle()
@@ -506,6 +554,15 @@ class MainViewModelTest {
         runCurrent()
         // themeModeFlow stores as ThemeMode, convert to check persistence
         coVerify { repository.setThemeMode(ThemeMode.LIGHT) }
+    }
+
+    @Test
+    fun `setColorSchemeOption updates state and persists via repository`() = runTest(testDispatcher) {
+        viewModel.setColorSchemeOption(ColorSchemeOption.CONTRAST_BLUE)
+        runCurrent()
+
+        assertEquals(ColorSchemeOption.CONTRAST_BLUE, viewModel.colorSchemeOptionFlow.value)
+        coVerify { repository.setColorSchemeOption(ColorSchemeOption.CONTRAST_BLUE) }
     }
 
     // ── Auto-refresh interval ──

@@ -114,6 +114,9 @@ class MainViewModel(
 
     fun setColorSchemeOption(option: ColorSchemeOption) {
         _colorSchemeOptionFlow.value = option
+        viewModelScope.launch {
+            repository.setColorSchemeOption(option)
+        }
     }
 
     // ── Index readiness ──
@@ -257,6 +260,11 @@ class MainViewModel(
             }
         }
         viewModelScope.launch {
+            repository.colorSchemeOptionFlow.collect { option ->
+                _colorSchemeOptionFlow.value = option
+            }
+        }
+        viewModelScope.launch {
             autoRefreshIntervalSeconds = repository.getAutoRefreshIntervalOnce()
             if (autoRefreshIntervalSeconds > 0) {
                 autoRefreshController.start(autoRefreshIntervalSeconds) { refreshAll(isAutoRefresh = true) }
@@ -276,7 +284,7 @@ class MainViewModel(
                 repository.collapsedStopsFlow,
                 _sortByEarliest
             ) { stops, cached, timestamps, collapsedStops, sortByEarliest ->
-                stops.map { stop ->
+                val mergedStops = stops.map { stop ->
                     val cachedServices = cached[stop.code] ?: emptyList()
                     val existing = _savedStops.value.find { it.busStop.code == stop.code }
                     BusStopWithArrivals(
@@ -287,10 +295,11 @@ class MainViewModel(
                         isOffline = existing?.isOffline ?: false,
                         lastUpdated = existing?.lastUpdated ?: 0L,
                         cachedAt = timestamps[stop.code] ?: 0L,
-                        isCollapsed = existing?.isCollapsed ?: collapsedStops.contains(stop.code),
+                        isCollapsed = existing?.isCollapsed ?: false,
                         isPinned = existing?.isPinned ?: false
                     )
-                } to sortByEarliest
+                }
+                useCase.applyPersistedCollapsedState(mergedStops, collapsedStops) to sortByEarliest
             }
             combine(baseFlow, _pinnedServices) { (stops, sortByEarliest), pinned ->
                 stops.map { stopWithArrivals ->
@@ -346,7 +355,7 @@ class MainViewModel(
                 addStopError = null
 
                 // Validate stop exists by fetching arrivals first
-                when (val arrivalResult = repository.getBusArrivals(formattedCode)) {
+                when (val arrivalResult = getBusArrivalsSafely(formattedCode)) {
                     is NetworkResult.Error -> {
                         addStopError = "Could not verify bus stop (${arrivalResult.message})."
                         addStopIsLoading = false
@@ -381,13 +390,22 @@ class MainViewModel(
                     addStopIsLoading = false
                     return@launch
                 }
-                // New stops default to collapsed
-                toggleCollapse(formattedCode)
+                collapseStop(formattedCode)
                 addStopIsLoading = false
                 hideAddStopDialog()
             } else {
                 addStopError = "Invalid bus stop code"
             }
+        }
+    }
+
+    private suspend fun getBusArrivalsSafely(code: String): NetworkResult<List<com.bushop.sg.domain.model.BusService>> {
+        return try {
+            repository.getBusArrivals(code)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            NetworkResult.Error(e.message ?: "Unexpected error", e)
         }
     }
 
@@ -430,7 +448,7 @@ class MainViewModel(
             }
         }
 
-        val result = repository.getBusArrivals(code)
+        val result = getBusArrivalsSafely(code)
 
         // Re-compute index — list may have changed during suspension
         val index = _savedStops.value.indexOfFirst { it.busStop.code == code }
@@ -549,6 +567,16 @@ class MainViewModel(
     fun toggleCollapse(code: String) {
         val (updated, collapsedCodes) = useCase.toggleCollapsed(_savedStops.value, code)
         _savedStops.value = updated
+        persistCollapsedStops(collapsedCodes.toSet())
+    }
+
+    private fun collapseStop(code: String) {
+        val (updated, collapsedCodes) = useCase.collapseStop(_savedStops.value, code)
+        _savedStops.value = updated
+        persistCollapsedStops(collapsedCodes)
+    }
+
+    private fun persistCollapsedStops(collapsedCodes: Set<String>) {
         // Debounce collapse state persistence (500ms)
         saveCollapseJob?.cancel()
         saveCollapseJob = viewModelScope.launch {

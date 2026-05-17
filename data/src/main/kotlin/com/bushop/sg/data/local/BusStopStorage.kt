@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.bushop.sg.domain.model.ColorSchemeOption
 import com.bushop.sg.domain.model.BusService
 import com.bushop.sg.domain.model.BusStop
 import com.bushop.sg.domain.model.DuplicateStopException
@@ -81,6 +82,21 @@ class BusStopStorage(private val context: Context) {
             
             stops.removeAll { it.code == code }
             prefs[busStopsKey] = gson.toJson(stops)
+
+            val collapsedKey = stringPreferencesKey("collapsed_stops_set")
+            val updatedCollapsed = parseStringSet(prefs[collapsedKey]).toMutableSet().apply {
+                remove(code)
+            }
+            prefs[collapsedKey] = gson.toJson(updatedCollapsed.toList())
+
+            val pinnedServicesKey = stringPreferencesKey("pinned_services")
+            val updatedPinnedServices = parsePinnedServices(prefs[pinnedServicesKey])
+                .filterNot { it.startsWith("$code:") }
+                .toSet()
+            prefs[pinnedServicesKey] = gson.toJson(updatedPinnedServices.toList())
+
+            prefs.remove(stringPreferencesKey("services_$code"))
+            prefs.remove(stringPreferencesKey("services_${code}_ts"))
         }
     }
 
@@ -185,6 +201,22 @@ class BusStopStorage(private val context: Context) {
                 ThemeMode.DARK -> "dark"
             }
             prefs[stringPreferencesKey("theme_mode_str")] = raw
+        }
+    }
+
+    // ── Colour scheme ──
+
+    val colorSchemeOptionFlow: Flow<ColorSchemeOption> = context.dataStore.data
+        .map { prefs ->
+            ColorSchemeOption.fromRawValue(
+                prefs[stringPreferencesKey("color_scheme_option")]
+            )
+        }
+        .distinctUntilChanged()
+
+    suspend fun saveColorSchemeOption(option: ColorSchemeOption) {
+        context.dataStore.edit { prefs ->
+            prefs[stringPreferencesKey("color_scheme_option")] = option.rawValue
         }
     }
 
