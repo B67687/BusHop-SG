@@ -6,6 +6,7 @@ import com.bushop.sg.data.local.BusStopStorage
 import com.bushop.sg.domain.api.BusArrivalDataSource
 import com.bushop.sg.domain.model.BusService
 import com.bushop.sg.domain.model.BusStop
+import com.bushop.sg.domain.model.ColorSchemeOption
 import com.bushop.sg.domain.model.NetworkResult
 import com.bushop.sg.domain.model.ThemeMode
 import com.bushop.sg.domain.model.toNetworkResult
@@ -27,6 +28,8 @@ class BusRepositoryImpl(
 
     override val themeModeFlow: Flow<ThemeMode> = storage.themeModeFlow
 
+    override val colorSchemeOptionFlow: Flow<ColorSchemeOption> = storage.colorSchemeOptionFlow
+
     override val collapsedStopsFlow: Flow<Set<String>> = storage.collapsedStopsFlow
 
     override val pinnedServicesFlow: Flow<Set<String>> = storage.pinnedServices
@@ -47,6 +50,10 @@ class BusRepositoryImpl(
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         storage.saveThemeMode(mode)
+    }
+
+    override suspend fun setColorSchemeOption(option: ColorSchemeOption) {
+        storage.saveColorSchemeOption(option)
     }
 
     override suspend fun savePinnedServices(pinned: Set<String>) {

@@ -231,6 +231,37 @@ class BusStopUseCaseTest {
         assertTrue(codes.isEmpty())
     }
 
+    @Test
+    fun `collapseStop forces expanded stop into collapsed set`() {
+        val stops = listOf(
+            BusStopWithArrivals(BusStop("11111"), isCollapsed = false)
+        )
+        val (result, codes) = useCase.collapseStop(stops, "11111")
+        assertTrue(result.first().isCollapsed)
+        assertEquals(setOf("11111"), codes)
+    }
+
+    @Test
+    fun `collapseStop for missing code still persists code for later flow merge`() {
+        val stops = listOf(
+            BusStopWithArrivals(BusStop("11111"), isCollapsed = true)
+        )
+        val (result, codes) = useCase.collapseStop(stops, "22222")
+        assertEquals(stops, result)
+        assertEquals(setOf("11111", "22222"), codes)
+    }
+
+    @Test
+    fun `applyPersistedCollapsedState gives precedence to persisted collapsed codes`() {
+        val stops = listOf(
+            BusStopWithArrivals(BusStop("11111"), isCollapsed = false),
+            BusStopWithArrivals(BusStop("22222"), isCollapsed = true)
+        )
+        val result = useCase.applyPersistedCollapsedState(stops, setOf("11111"))
+        assertTrue(result.first().isCollapsed)
+        assertTrue(result[1].isCollapsed)
+    }
+
     // ── ApplyPinning edge cases ──
 
     @Test

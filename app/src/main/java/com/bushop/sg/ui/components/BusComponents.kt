@@ -2,6 +2,7 @@ package com.bushop.sg.ui.components
 
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -14,13 +15,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.material.icons.filled.Chair
 import androidx.compose.material.icons.filled.DirectionsBus
-import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.outlined.DirectionsBus
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,6 +64,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.zIndex
 
 import androidx.compose.ui.graphics.graphicsLayer
@@ -72,9 +75,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.ui.window.Popup
 import com.bushop.sg.domain.model.BusService
 import com.bushop.sg.domain.model.BusStopWithArrivals
@@ -92,7 +97,9 @@ fun BusStopCard(
     pinnedServiceNos: Set<String> = emptySet(),
     onMoveStop: ((Int) -> Unit)? = null,  // called on drag end (multi-position delta)
     onDragStart: ((code: String) -> Unit)? = null,   // called when drag begins
+    onDragProgress: ((code: String, lastTotalY: Float, draggedCenterY: Float) -> Unit)? = null,
     onDragEnd: ((code: String, lastTotalY: Float) -> Unit)? = null,  // called when drag ends
+    isDeleteTargeted: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val busStopCode = stop.busStop.code
@@ -104,22 +111,34 @@ fun BusStopCard(
     val isCollapsed = stop.isCollapsed
     val isPinned = stop.isPinned
     val haptic = LocalHapticFeedback.current
-    val dragDensity = LocalDensity.current
-    val itemHeightPx = with(dragDensity) { 140.dp.toPx() }
     var localDragOffset by remember { mutableStateOf(0f) }
     var isLocallyDragged by remember { mutableStateOf(false) }
     var collapsedForDrag by remember { mutableStateOf(false) }
+    var cardCenterYInRoot by remember { mutableStateOf(0f) }
     val visuallyDragged = isLocallyDragged
     val effectiveOffset = localDragOffset
     val effectiveCollapsed = collapsedForDrag || isCollapsed
+    val dragScale by animateFloatAsState(
+        targetValue = if (isDeleteTargeted) 0.86f else 1f,
+        animationSpec = tween(durationMillis = 140),
+        label = "dragScale"
+    )
 
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .onGloballyPositioned { coordinates ->
+                cardCenterYInRoot = coordinates.positionInRoot().y + (coordinates.size.height / 2f)
+            }
             .then(
                 if (visuallyDragged) Modifier
                     .zIndex(1f)
-                    .graphicsLayer { translationY = effectiveOffset }
+                    .graphicsLayer {
+                        translationY = effectiveOffset
+                        scaleX = dragScale
+                        scaleY = dragScale
+                        alpha = if (isDeleteTargeted) 0.92f else 1f
+                    }
                     .shadow(12.dp, RoundedCornerShape(20.dp))
                 else Modifier
             ),
@@ -142,45 +161,63 @@ fun BusStopCard(
                     .padding(horizontal = 16.dp, vertical = 12.dp)
                     .then(
                         if (onMoveStop != null) {
-                            // Drag mode: tap (outer, second) + drag (inner, first = gets events first)
                             Modifier
-                                .pointerInput(onToggleCollapse) {
-                                    detectTapGestures(onTap = { onToggleCollapse() })
-                                }
-                                .pointerInput(onMoveStop) {
-                                    var totalY = 0f
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = {
-                                            totalY = 0f
-                                            isLocallyDragged = true
-                                            localDragOffset = 0f
-                                            if (!isCollapsed) collapsedForDrag = true
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            onDragStart?.invoke(busStopCode)
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            change.consume()
-                                            totalY += dragAmount.y
-                                            localDragOffset = totalY
-                                        },
-                                        onDragEnd = {
+                                .pointerInput(busStopCode, isCollapsed, onMoveStop) {
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown(requireUnconsumed = false)
+                                        val longPress = awaitLongPressOrCancellation(down.id)
+
+                                        if (longPress == null) {
+                                            onToggleCollapse()
+                                            return@awaitEachGesture
+                                        }
+
+                                        var totalY = 0f
+                                        isLocallyDragged = true
+                                        localDragOffset = 0f
+                                        if (!isCollapsed) collapsedForDrag = true
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onDragStart?.invoke(busStopCode)
+
+                                        try {
+                                            while (true) {
+                                                val event = awaitPointerEvent()
+                                                val change = event.changes.firstOrNull { it.id == down.id }
+                                                    ?: event.changes.firstOrNull()
+                                                    ?: break
+
+                                                if (!change.pressed) break
+
+                                                val deltaY = change.positionChange().y
+                                                if (deltaY != 0f) {
+                                                    totalY += deltaY
+                                                    localDragOffset = totalY
+                                                    onDragProgress?.invoke(
+                                                        busStopCode,
+                                                        totalY,
+                                                        cardCenterYInRoot + totalY
+                                                    )
+                                                    change.consume()
+                                                }
+                                            }
+                                        } finally {
                                             onDragEnd?.invoke(busStopCode, totalY)
                                             isLocallyDragged = false
                                             localDragOffset = 0f
                                             collapsedForDrag = false
-                                        },
-                                        onDragCancel = {
-                                            isLocallyDragged = false
-                                            localDragOffset = 0f
-                                            collapsedForDrag = false
                                         }
-                                    )
+                                    }
                                 }
                         } else Modifier.pointerInput(onToggleCollapse, onDelete) {
-                            detectTapGestures(
-                                onTap = { onToggleCollapse() },
-                                onLongPress = { onDelete() }
-                            )
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                val longPress = awaitLongPressOrCancellation(down.id)
+                                if (longPress == null) {
+                                    onToggleCollapse()
+                                } else {
+                                    onDelete()
+                                }
+                            }
                         }
                     ),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -516,7 +553,7 @@ fun BusServiceRow(service: BusService, isPinned: Boolean = false, onTogglePinSer
                     Icon(
                         imageVector = when {
                             arrival.load.contains("Seats") -> Icons.Default.Chair
-                            arrival.load.contains("Standing") -> Icons.Default.DirectionsWalk
+                            arrival.load.contains("Standing") -> Icons.AutoMirrored.Filled.DirectionsWalk
                             else -> Icons.Default.Warning
                         },
                         contentDescription = null,
@@ -617,5 +654,3 @@ private fun OperatorBadge(operator: String) {
         )
     }
 }
-
-
