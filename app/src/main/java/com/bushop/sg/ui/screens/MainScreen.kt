@@ -44,7 +44,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -74,7 +76,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -178,11 +182,14 @@ fun MainScreen(viewModel: MainViewModel) {
     var showSettings by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    
+    val pullToRefreshState = rememberPullToRefreshState()
+
     var deleteTarget by remember { mutableStateOf<String?>(null) }
 
     // Drag state for delete zone
     var draggedCode by remember { mutableStateOf<String?>(null) }
+    var isDragOverDeleteZone by remember { mutableStateOf(false) }
+    var deleteZoneTopPx by remember { mutableStateOf(Float.POSITIVE_INFINITY) }
     val density = LocalDensity.current
     val dragItemHeightPx = with(density) { 140.dp.toPx() }
     val deleteZoneThresholdPx = with(density) { 60.dp.toPx() }
@@ -345,7 +352,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             )
                         }
                     } else {
-                        if (draggedCode != null) {
+                        val stopListContent: @Composable () -> Unit = {
                             LazyColumn(
                                 state = listState,
                                 modifier = Modifier.fillMaxSize(),
@@ -376,69 +383,54 @@ fun MainScreen(viewModel: MainViewModel) {
                                         },
                                         onDragStart = { code ->
                                             draggedCode = code
+                                            isDragOverDeleteZone = false
+                                        },
+                                        onDragProgress = { code, lastTotalY, draggedCenterY ->
+                                            if (draggedCode == code) {
+                                                val hasMeasuredDeleteZone = deleteZoneTopPx.isFinite()
+                                                isDragOverDeleteZone = if (hasMeasuredDeleteZone) {
+                                                    draggedCenterY >= deleteZoneTopPx
+                                                } else {
+                                                    lastTotalY > (savedStops.size * dragItemHeightPx) + deleteZoneThresholdPx
+                                                }
+                                            }
                                         },
                                         onDragEnd = { code, lastTotalY ->
-                                            val deleteThreshold = savedStops.size * dragItemHeightPx + deleteZoneThresholdPx
-                                            if (lastTotalY > deleteThreshold) {
+                                            val deleteThreshold = (savedStops.size * dragItemHeightPx) + deleteZoneThresholdPx
+                                            val shouldDelete = isDragOverDeleteZone || lastTotalY > deleteThreshold
+                                            if (shouldDelete) {
                                                 viewModel.removeBusStop(code)
                                             } else if (lastTotalY != 0f) {
                                                 val delta = (lastTotalY / dragItemHeightPx).toInt()
                                                 if (delta != 0) viewModel.moveStop(code, delta)
                                             }
                                             draggedCode = null
-                                        }
+                                            isDragOverDeleteZone = false
+                                        },
+                                        isDeleteTargeted = draggedCode == stopWithArrivals.busStop.code && isDragOverDeleteZone
                                     )
                                 }
                             }
+                        }
+
+                        if (draggedCode != null) {
+                            stopListContent()
                         } else {
                             PullToRefreshBox(
                                 isRefreshing = viewModel.isRefreshing,
-                                onRefresh = { viewModel.refreshAll() }
-                            ) {
-                                LazyColumn(
-                                    state = listState,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(
-                                        start = 16.dp, end = 16.dp, top = 16.dp, bottom = 40.dp
-                                    ),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    items(
-                                        items = savedStops,
-                                        key = { it.busStop.code }
-                                    ) { stopWithArrivals ->
-                                        BusStopCard(
-                                            modifier = Modifier.animateItem(),
-                                            stop = stopWithArrivals,
-                                            onRefresh = { viewModel.refreshArrivals(stopWithArrivals.busStop.code) },
-                                            onToggleCollapse = { viewModel.toggleCollapse(stopWithArrivals.busStop.code) },
-                                            onTogglePin = { viewModel.togglePin(stopWithArrivals.busStop.code) },
-                                            onDelete = { deleteTarget = stopWithArrivals.busStop.code },
-                                            onTogglePinService = { serviceNo ->
-                                                viewModel.togglePinService(stopWithArrivals.busStop.code, serviceNo)
-                                            },
-                                            pinnedServiceNos = pinnedServices
-                                                .filter { it.startsWith("${stopWithArrivals.busStop.code}:") }
-                                                .map { it.substringAfter(":") }.toSet(),
-                                            onMoveStop = { delta ->
-                                                viewModel.moveStop(stopWithArrivals.busStop.code, delta)
-                                            },
-                                            onDragStart = { code ->
-                                                draggedCode = code
-                                            },
-                                            onDragEnd = { code, lastTotalY ->
-                                                val deleteThreshold = savedStops.size * dragItemHeightPx + deleteZoneThresholdPx
-                                                if (lastTotalY > deleteThreshold) {
-                                                    viewModel.removeBusStop(code)
-                                                } else if (lastTotalY != 0f) {
-                                                    val delta = (lastTotalY / dragItemHeightPx).toInt()
-                                                    if (delta != 0) viewModel.moveStop(code, delta)
-                                                }
-                                                draggedCode = null
-                                            }
-                                        )
-                                    }
+                                onRefresh = { viewModel.refreshAll() },
+                                state = pullToRefreshState,
+                                indicator = {
+                                    PullToRefreshDefaults.Indicator(
+                                        modifier = Modifier.align(Alignment.TopCenter),
+                                        isRefreshing = viewModel.isRefreshing,
+                                        state = pullToRefreshState,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                                    )
                                 }
+                            ) {
+                                stopListContent()
                             }
                         }
                     }
@@ -511,12 +503,20 @@ fun MainScreen(viewModel: MainViewModel) {
         }
          // ── Drag-to-delete zone overlay ──
          if (draggedCode != null) {
+             val deleteZoneColor = if (isDragOverDeleteZone) {
+                 MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
+             } else {
+                 MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.75f)
+             }
              Box(
                  modifier = Modifier
                      .align(Alignment.BottomCenter)
                      .fillMaxWidth()
                      .height(80.dp)
-                     .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f))
+                     .onGloballyPositioned { coordinates ->
+                         deleteZoneTopPx = coordinates.positionInRoot().y
+                     }
+                     .background(deleteZoneColor)
                      .padding(16.dp),
                  contentAlignment = Alignment.Center
              ) {
@@ -530,7 +530,7 @@ fun MainScreen(viewModel: MainViewModel) {
                          tint = MaterialTheme.colorScheme.onErrorContainer
                      )
                      Text(
-                         text = "Drag here to delete",
+                         text = if (isDragOverDeleteZone) "Release to delete" else "Drag here to delete",
                          style = MaterialTheme.typography.titleSmall,
                          color = MaterialTheme.colorScheme.onErrorContainer,
                          fontWeight = FontWeight.Bold

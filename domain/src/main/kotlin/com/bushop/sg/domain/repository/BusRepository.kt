@@ -2,6 +2,7 @@ package com.bushop.sg.domain.repository
 
 import com.bushop.sg.domain.model.BusService
 import com.bushop.sg.domain.model.BusStop
+import com.bushop.sg.domain.model.ColorSchemeOption
 import com.bushop.sg.domain.model.NetworkResult
 import com.bushop.sg.domain.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -13,6 +14,7 @@ interface BusRepository {
     val cachedBusServices: Flow<Map<String, List<BusService>>>
     val cachedTimestamps: Flow<Map<String, Long>>
     val themeModeFlow: Flow<ThemeMode>
+    val colorSchemeOptionFlow: Flow<ColorSchemeOption>
     val collapsedStopsFlow: Flow<Set<String>>
     val isIndexReady: StateFlow<Boolean>
     val autoRefreshInterval: Flow<Int>
@@ -20,6 +22,7 @@ interface BusRepository {
     suspend fun getAutoRefreshIntervalOnce(): Int
     suspend fun setAutoRefreshInterval(seconds: Int)
     suspend fun setThemeMode(mode: ThemeMode)
+    suspend fun setColorSchemeOption(option: ColorSchemeOption)
     suspend fun setCollapsedStops(stops: Set<String>)
     val pinnedServicesFlow: Flow<Set<String>>
     suspend fun savePinnedServices(pinned: Set<String>)

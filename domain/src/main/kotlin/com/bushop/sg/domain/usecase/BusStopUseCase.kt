@@ -54,12 +54,44 @@ class BusStopUseCase {
         code: String
     ): Pair<List<BusStopWithArrivals>, List<String>> {
         val index = stops.indexOfFirst { it.busStop.code == code }
-        if (index == -1) return stops to (stops.filter { it.isCollapsed }.map { it.busStop.code })
+        if (index == -1) return stops to collectCollapsedCodes(stops)
         val newCollapsed = !stops[index].isCollapsed
         val updated = stops.toMutableList().apply {
             this[index] = this[index].copy(isCollapsed = newCollapsed)
         }
-        val collapsedCodes = updated.filter { it.isCollapsed }.map { it.busStop.code }
-        return updated to collapsedCodes
+        return updated to collectCollapsedCodes(updated)
+    }
+
+    fun collapseStop(
+        stops: List<BusStopWithArrivals>,
+        code: String
+    ): Pair<List<BusStopWithArrivals>, Set<String>> {
+        val index = stops.indexOfFirst { it.busStop.code == code }
+        if (index == -1) {
+            return stops to (collectCollapsedCodes(stops).toMutableSet().apply { add(code) })
+        }
+        if (stops[index].isCollapsed) {
+            return stops to collectCollapsedCodes(stops).toSet()
+        }
+
+        val updated = stops.toMutableList().apply {
+            this[index] = this[index].copy(isCollapsed = true)
+        }
+        return updated to collectCollapsedCodes(updated).toSet()
+    }
+
+    fun applyPersistedCollapsedState(
+        stops: List<BusStopWithArrivals>,
+        collapsedStops: Set<String>
+    ): List<BusStopWithArrivals> {
+        return stops.map { stop ->
+            stop.copy(
+                isCollapsed = if (stop.busStop.code in collapsedStops) true else stop.isCollapsed
+            )
+        }
+    }
+
+    fun collectCollapsedCodes(stops: List<BusStopWithArrivals>): List<String> {
+        return stops.filter { it.isCollapsed }.map { it.busStop.code }
     }
 }
