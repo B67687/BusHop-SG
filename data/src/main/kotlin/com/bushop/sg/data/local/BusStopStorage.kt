@@ -28,6 +28,7 @@ class BusStopStorage(
 ) {
     companion object {
         private const val CACHE_TTL_MS = 24 * 60 * 60 * 1000L // 24 hours
+        private val serviceListType = object : TypeToken<List<BusService>>() {}.type
     }
 
     private val gson = Gson()
@@ -135,9 +136,8 @@ class BusStopStorage(
                         if (now - ts > ttlMs) return@mapNotNull null
                         val servicesKey = stringPreferencesKey("services_$code")
                         try {
-                            val type = object : TypeToken<List<BusService>>() {}.type
                             val value = prefs[servicesKey] as? String ?: return@mapNotNull null
-                            val services: List<BusService> = gson.fromJson(value, type) ?: emptyList()
+                            val services: List<BusService> = gson.fromJson(value, serviceListType) ?: emptyList()
                             code to services
                         } catch (e: Exception) {
                             code to emptyList<BusService>()
