@@ -36,7 +36,7 @@ object ApiClient {
             .Builder()
             .baseUrl(BASE_URL)
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(GsonProvider.gson))
             .build()
             .create(ArrivelahApi::class.java)
     }
