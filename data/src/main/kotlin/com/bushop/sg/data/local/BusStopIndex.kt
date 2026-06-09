@@ -33,6 +33,7 @@ data class BusStopEntry(
 class BusStopIndex(
     private val context: Context,
 ) {
+    private val gson = Gson()
     private val abbreviationMap =
         mapOf(
             "bt" to "bukit",
@@ -133,7 +134,7 @@ class BusStopIndex(
             val type = object : TypeToken<Map<String, List<Any>>>() {}.type
             val raw: Map<String, List<Any>> =
                 try {
-                    Gson().fromJson(json, type) ?: emptyMap()
+                    gson.fromJson(json, type) ?: emptyMap()
                 } catch (e: Exception) {
                     emptyMap()
                 }
