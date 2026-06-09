@@ -28,10 +28,13 @@ class BusStopStorage(
 ) {
     companion object {
         private const val CACHE_TTL_MS = 24 * 60 * 60 * 1000L // 24 hours
-        private val serviceListType = object : TypeToken<List<BusService>>() {}.type
-        private val busStopListType = object : TypeToken<List<BusStop>>() {}.type
-        private val mutableBusStopListType = object : TypeToken<MutableList<BusStop>>() {}.type
-        private val stringSetType = object : TypeToken<Set<String>>() {}.type
+
+        // Use getParameterized() instead of anonymous TypeToken subclasses —
+        // R8 cannot strip generic signatures from direct API calls.
+        private val serviceListType = TypeToken.getParameterized(List::class.java, BusService::class.java).type
+        private val busStopListType = TypeToken.getParameterized(List::class.java, BusStop::class.java).type
+        private val mutableBusStopListType = TypeToken.getParameterized(MutableList::class.java, BusStop::class.java).type
+        private val stringSetType = TypeToken.getParameterized(Set::class.java, String::class.java).type
     }
 
     private val gson = GsonProvider.gson

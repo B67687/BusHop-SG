@@ -118,7 +118,7 @@ class ArchitectureTest {
         )
     }
 
-    // ── ProGuard keep rules must reference existing packages ──
+    // ── ProGuard keep rules must reference existing first-party packages ──
 
     @Test
     fun `proguard keep rules match existing packages`() {
@@ -134,17 +134,27 @@ class ArchitectureTest {
                 val match = pattern.find(trimmed)
                 if (match != null) {
                     val classSpec = match.groupValues[1]
-                    val packagePart =
+                    val rawClass =
                         classSpec
                             .removePrefix("class ")
                             .removeSuffix(".**")
                             .removeSuffix(".*")
-                            .replace('.', '/')
+                    // Only validate packages in our source tree — library/third-party packages
+                    // (androidx, com.google, retrofit2, okhttp3, kotlin, kotlinx) won't be found.
+                    if (!rawClass.startsWith("com.bushop.sg")) continue
+                    // Strip inner class ($Factory, $Companion, etc.) — they live in the outer class file
+                    val outerClass = rawClass.substringBefore('$')
+                    val packagePart = outerClass.replace('.', '/')
                     val domainDir = File(projectRoot, "domain/src/main/kotlin/$packagePart")
                     val dataDir = File(projectRoot, "data/src/main/kotlin/$packagePart")
-                    val appDir = File(projectRoot, "app/src/main/kotlin/$packagePart")
-                    if (!domainDir.exists() && !dataDir.exists() && !appDir.exists()) {
-                        violations.add("'$trimmed' — package '$packagePart' not found in any module")
+                    val appDir = File(projectRoot, "app/src/main/java/$packagePart")
+                    val domainFile = File(projectRoot, "domain/src/main/kotlin/$packagePart.kt")
+                    val dataFile = File(projectRoot, "data/src/main/kotlin/$packagePart.kt")
+                    val appFile = File(projectRoot, "app/src/main/java/$packagePart.kt")
+                    if (!domainDir.exists() && !dataDir.exists() && !appDir.exists() &&
+                        !domainFile.exists() && !dataFile.exists() && !appFile.exists()
+                    ) {
+                        violations.add("'$trimmed' — '$outerClass' not found in any module")
                     }
                 }
             }
