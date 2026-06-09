@@ -165,17 +165,6 @@ class BusStopStorage(
         }
     }
 
-    /** Remove cached services for stops that are no longer saved.
-     *  Called after [removeBusStop]. */
-    suspend fun evictBusServices(code: String) {
-        val servicesKey = stringPreferencesKey("services_$code")
-        val timestampKey = stringPreferencesKey("services_${code}_ts")
-        context.dataStore.edit { prefs ->
-            prefs.remove(servicesKey)
-            prefs.remove(timestampKey)
-        }
-    }
-
     // ── Auto-refresh interval ──
 
     val autoRefreshInterval: Flow<Int> =

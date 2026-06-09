@@ -34,7 +34,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bushop.sg.data.local.BusStopEntry
 import kotlinx.coroutines.delay
-import kotlin.random.Random
 
 @Composable
 fun AddBusStopDialog(
@@ -124,7 +123,7 @@ fun AddBusStopDialog(
                                     "55555 (Punggol Temp Int)",
                                 )
                             }
-                        val randomHint = remember { hints[Random.nextInt(hints.size)] }
+                        val randomHint = remember { hints.random() }
                         Text("e.g. $randomHint")
                     },
                     modifier = Modifier.fillMaxWidth(),
