@@ -1,5 +1,6 @@
 <div align="center">
-  <h1>🚌 BusHop-SG</h1>
+  <img src="docs/icon.svg" alt="BusHop-SG" width="96" height="96">
+  <h1>BusHop-SG</h1>
   <p><strong>Lightweight Singapore bus timing app</strong></p>
   <p>Material 3 Compose UI with real-time arrivals, drag-to-reorder, pinning, and smart search.</p>
   <p>
@@ -43,7 +44,10 @@
 
 ## Download
 
-> **Latest release:** [v1.0.0](https://github.com/B67687/BusHop-SG/releases/latest) — `bus-hop.apk` (**1.9 MB**, R8-minified release build)
+> **Latest release:** [v1.0.0](https://github.com/B67687/BusHop-SG/releases/latest)
+>
+> - `bus-hop.apk` — **1.9 MB** (R8-minified release build, signed, recommended)
+> - `bus-hop-debug.apk` — 17.7 MB (debug build, unminified, alternative)
 
 Or [build from source](#build-from-source).
 
