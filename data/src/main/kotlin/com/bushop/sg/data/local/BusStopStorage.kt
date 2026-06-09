@@ -29,6 +29,9 @@ class BusStopStorage(
     companion object {
         private const val CACHE_TTL_MS = 24 * 60 * 60 * 1000L // 24 hours
         private val serviceListType = object : TypeToken<List<BusService>>() {}.type
+        private val busStopListType = object : TypeToken<List<BusStop>>() {}.type
+        private val mutableBusStopListType = object : TypeToken<MutableList<BusStop>>() {}.type
+        private val stringSetType = object : TypeToken<Set<String>>() {}.type
     }
 
     private val gson = Gson()
@@ -36,14 +39,14 @@ class BusStopStorage(
 
     val savedBusStops: Flow<List<BusStop>> =
         context.dataStore.data
-            .map { prefs -> parseBusStopList(prefs[busStopsKey]) }
+            .map { prefs -> prefs[busStopsKey] }
             .distinctUntilChanged()
+            .map { raw -> parseBusStopList(raw) }
 
     private fun parseBusStopList(json: String?): List<BusStop> {
         val text = json ?: return emptyList()
         return try {
-            val type = object : TypeToken<List<BusStop>>() {}.type
-            gson.fromJson<List<BusStop>>(text, type) ?: emptyList()
+            gson.fromJson<List<BusStop>>(text, busStopListType) ?: emptyList()
         } catch (e: Exception) {
             emptyList()
         }
@@ -53,10 +56,9 @@ class BusStopStorage(
         var result = Result.success(Unit)
         context.dataStore.edit { prefs ->
             val json = prefs[busStopsKey] ?: "[]"
-            val type = object : TypeToken<MutableList<BusStop>>() {}.type
             val stops: MutableList<BusStop> =
                 try {
-                    gson.fromJson(json, type) ?: mutableListOf()
+                    gson.fromJson(json, mutableBusStopListType) ?: mutableListOf()
                 } catch (e: Exception) {
                     result = Result.failure(Exception("Failed to read saved stops"))
                     return@edit
@@ -81,10 +83,9 @@ class BusStopStorage(
     suspend fun removeBusStop(code: String) {
         context.dataStore.edit { prefs ->
             val json = prefs[busStopsKey] ?: "[]"
-            val type = object : TypeToken<MutableList<BusStop>>() {}.type
             val stops: MutableList<BusStop> =
                 try {
-                    gson.fromJson(json, type) ?: mutableListOf()
+                    gson.fromJson(json, mutableBusStopListType) ?: mutableListOf()
                 } catch (e: Exception) {
                     return@edit // Abort — don't overwrite with empty list
                 }
@@ -232,8 +233,9 @@ class BusStopStorage(
 
     val sortByEarliestFlow: Flow<Boolean> =
         context.dataStore.data
-            .map { prefs -> prefs[stringPreferencesKey("sort_by_earliest")]?.toBooleanStrictOrNull() ?: false }
+            .map { prefs -> prefs[stringPreferencesKey("sort_by_earliest")] }
             .distinctUntilChanged()
+            .map { raw -> raw?.toBooleanStrictOrNull() ?: false }
 
     suspend fun saveSortByEarliest(enabled: Boolean) {
         context.dataStore.edit { prefs ->
@@ -245,8 +247,9 @@ class BusStopStorage(
 
     val collapsedStopsFlow: Flow<Set<String>> =
         context.dataStore.data
-            .map { prefs -> parseStringSet(prefs[stringPreferencesKey("collapsed_stops_set")]) }
+            .map { prefs -> prefs[stringPreferencesKey("collapsed_stops_set")] }
             .distinctUntilChanged()
+            .map { raw -> parseStringSet(raw) }
 
     suspend fun saveCollapsedStops(stops: Set<String>) {
         context.dataStore.edit { prefs ->
@@ -257,7 +260,7 @@ class BusStopStorage(
     private fun parseStringSet(json: String?): Set<String> {
         val text = json ?: return emptySet()
         return try {
-            gson.fromJson(text, object : TypeToken<Set<String>>() {}.type) ?: emptySet()
+            gson.fromJson(text, stringSetType) ?: emptySet()
         } catch (e: Exception) {
             emptySet()
         }
@@ -267,8 +270,9 @@ class BusStopStorage(
 
     val pinnedServices: Flow<Set<String>> =
         context.dataStore.data
-            .map { prefs -> parsePinnedServices(prefs[stringPreferencesKey("pinned_services")]) }
+            .map { prefs -> prefs[stringPreferencesKey("pinned_services")] }
             .distinctUntilChanged()
+            .map { raw -> parsePinnedServices(raw) }
 
     private fun parsePinnedServices(json: String?): Set<String> = parseStringSet(json)
 

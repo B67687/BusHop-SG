@@ -30,11 +30,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        if (BuildConfig.DEBUG) {
+            com.bushop.sg.data.api.ApiClient
+                .enableDebugLogging()
+        }
         val storage = BusStopStorage(applicationContext)
         val dataSource = RetrofitBusArrivalDataSource()
         val busStopIndex =
             BusStopIndex(applicationContext).also { idx ->
-                lifecycleScope.launch(Dispatchers.IO) { idx.load() }
+                lifecycleScope.launch { idx.load() }
             }
         val repository = BusRepositoryImpl(storage, dataSource, busStopIndex)
         val viewModelFactory = MainViewModel.Factory(application, repository, busStopIndex)

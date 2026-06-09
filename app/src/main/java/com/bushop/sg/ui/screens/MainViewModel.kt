@@ -234,7 +234,8 @@ class MainViewModel(
         isDownloadingUpdate = true
         viewModelScope.launch {
             try {
-                val targetFile = File(getApplication<android.app.Application>().cacheDir, "bus-hop-update.apk")
+                val updatesDir = File(getApplication<android.app.Application>().cacheDir, "updates").also { it.mkdirs() }
+                val targetFile = File(updatesDir, "bus-hop-update.apk")
                 val success = updateChecker.downloadApk(info.downloadUrl, targetFile)
                 if (success) {
                     val apkUri =
