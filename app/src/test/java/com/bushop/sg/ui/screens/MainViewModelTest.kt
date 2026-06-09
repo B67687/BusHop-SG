@@ -780,4 +780,47 @@ class MainViewModelTest {
             val codes = viewModel.savedStops.value.map { it.busStop.code }
             assertEquals(listOf("11111", "22222"), codes)
         }
+
+    @Test
+    fun `moveStop on nonexistent code does nothing`() =
+        runTest(testDispatcher) {
+            savedStopsFlow.value = listOf(BusStop("11111"), BusStop("22222"))
+            advanceUntilIdle()
+
+            viewModel.moveStop("99999", 1)
+            advanceUntilIdle()
+            val codes = viewModel.savedStops.value.map { it.busStop.code }
+            assertEquals(listOf("11111", "22222"), codes)
+        }
+
+    @Test
+    fun `moveStop with large negative delta clamps to start`() =
+        runTest(testDispatcher) {
+            savedStopsFlow.value = listOf(BusStop("11111"), BusStop("22222"), BusStop("33333"))
+            advanceUntilIdle()
+
+            viewModel.moveStop("33333", -99)
+            advanceUntilIdle()
+            val codes = viewModel.savedStops.value.map { it.busStop.code }
+            assertEquals(listOf("33333", "11111", "22222"), codes)
+        }
+
+    @Test
+    fun `removeBusStop during drag simulation does not crash`() =
+        runTest(testDispatcher) {
+            savedStopsFlow.value = listOf(BusStop("11111"), BusStop("22222"), BusStop("33333"))
+            advanceUntilIdle()
+
+            // Simulate: stop 22222 is being dragged, then deleted
+            viewModel.removeBusStop("22222")
+            advanceUntilIdle()
+            var codes = viewModel.savedStops.value.map { it.busStop.code }
+            assertEquals(listOf("11111", "33333"), codes)
+
+            // Subsequent moveStop on the removed stop should be no-op
+            viewModel.moveStop("22222", 1)
+            advanceUntilIdle()
+            codes = viewModel.savedStops.value.map { it.busStop.code }
+            assertEquals(listOf("11111", "33333"), codes)
+        }
 }

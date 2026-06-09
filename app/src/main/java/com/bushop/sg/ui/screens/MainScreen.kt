@@ -385,7 +385,9 @@ fun MainScreen(viewModel: MainViewModel) {
                                     BusStopCard(
                                         modifier =
                                             if (draggedCode != stopWithArrivals.busStop.code) {
-                                                Modifier.animateItem()
+                                                Modifier.animateItem(
+                                                    placementSpec = tween(durationMillis = 200),
+                                                )
                                             } else {
                                                 Modifier
                                             },
