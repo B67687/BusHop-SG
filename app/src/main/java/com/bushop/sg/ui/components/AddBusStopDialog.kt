@@ -56,6 +56,7 @@ fun AddBusStopDialog(
 
     LaunchedEffect(searchQuery) {
         if (searchQuery.length >= 2) {
+            delay(300L) // Debounce keystrokes
             onSearchQueryChanged(searchQuery.trim())
         }
     }
@@ -170,7 +171,7 @@ fun AddBusStopDialog(
                         Spacer(Modifier.height(4.dp))
                     }
                     LazyColumn(modifier = Modifier.fillMaxWidth().height(260.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        items(activeResults) { entry ->
+                        items(activeResults, key = { it.code }) { entry ->
                             Row(
                                 modifier =
                                     Modifier

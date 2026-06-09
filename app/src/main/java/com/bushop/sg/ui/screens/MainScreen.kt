@@ -380,6 +380,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                     items = savedStops,
                                     key = { it.busStop.code },
                                 ) { stopWithArrivals ->
+                                    val stopCode = stopWithArrivals.busStop.code
                                     BusStopCard(
                                         modifier =
                                             Modifier.animateItem(
@@ -387,22 +388,27 @@ fun MainScreen(viewModel: MainViewModel) {
                                                     if (draggedCode == stopWithArrivals.busStop.code) {
                                                         tween(durationMillis = 0)
                                                     } else {
-                                                        tween(durationMillis = 200)
+                                                        tween(durationMillis = 280)
                                                     },
                                             ),
                                         stop = stopWithArrivals,
-                                        onRefresh = { viewModel.refreshArrivals(stopWithArrivals.busStop.code) },
-                                        onToggleCollapse = { viewModel.toggleCollapse(stopWithArrivals.busStop.code) },
-                                        onTogglePin = { viewModel.togglePin(stopWithArrivals.busStop.code) },
-                                        onDelete = { deleteTarget = stopWithArrivals.busStop.code },
-                                        onTogglePinService = { serviceNo ->
-                                            viewModel.togglePinService(stopWithArrivals.busStop.code, serviceNo)
-                                        },
+                                        onRefresh = remember(stopCode) { { viewModel.refreshArrivals(stopCode) } },
+                                        onToggleCollapse = remember(stopCode) { { viewModel.toggleCollapse(stopCode) } },
+                                        onTogglePin = remember(stopCode) { { viewModel.togglePin(stopCode) } },
+                                        onDelete = remember(stopCode) { { deleteTarget = stopCode } },
+                                        onTogglePinService =
+                                            remember(stopCode) {
+                                                { serviceNo ->
+                                                    viewModel.togglePinService(stopCode, serviceNo)
+                                                }
+                                            },
                                         pinnedServiceNos =
-                                            pinnedServices
-                                                .filter { it.startsWith("${stopWithArrivals.busStop.code}:") }
-                                                .map { it.substringAfter(":") }
-                                                .toSet(),
+                                            remember(stopCode, pinnedServices) {
+                                                pinnedServices
+                                                    .filter { it.startsWith("$stopCode:") }
+                                                    .map { it.substringAfter(":") }
+                                                    .toSet()
+                                            },
                                         onMoveStop = { delta ->
                                             viewModel.moveStop(stopWithArrivals.busStop.code, delta)
                                         },

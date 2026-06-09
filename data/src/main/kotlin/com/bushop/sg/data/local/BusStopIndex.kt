@@ -31,7 +31,6 @@ data class BusStopEntry(
  * Abbreviations expanded: bt→bukit, blk→block, int→interchange, amk→ang mo kio, cck→choa chu kang, etc.
  */
 
-/** Trie for O(prefix_length) prefix matching of indexed tokens. */
 private class TokenTrie {
     private class Node {
         val children = mutableMapOf<Char, Node>()

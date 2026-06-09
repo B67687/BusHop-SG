@@ -217,7 +217,7 @@ fun BusStopCard(
                                         )
                                     }
                             } else {
-                                Modifier.pointerInput(onToggleCollapse, onDelete) {
+                                Modifier.pointerInput(busStopCode) {
                                     detectTapGestures(
                                         onTap = { onToggleCollapse() },
                                         onLongPress = { onDelete() },
@@ -351,14 +351,17 @@ fun BusStopCard(
             // (removed from layout to keep card collapsed). animateItem(tween(0)) on the
             // LazyColumn item prevents position bounce from layout change.
             val showExpanded = !effectiveCollapsed && !isLocallyDragged
+            // During drag, animate instantly (no layout animation competing with graphicsLayer)
+            val exitDuration = if (isLocallyDragged) 0 else 150
+            val enterDuration = if (isLocallyDragged) 0 else 280
             AnimatedVisibility(
                 visible = showExpanded,
                 enter =
-                    fadeIn(animationSpec = tween(durationMillis = 280, easing = easing)) +
-                        expandVertically(animationSpec = tween(durationMillis = 280, easing = easing)),
+                    fadeIn(animationSpec = tween(durationMillis = enterDuration, easing = easing)) +
+                        expandVertically(animationSpec = tween(durationMillis = enterDuration, easing = easing)),
                 exit =
-                    fadeOut(animationSpec = tween(durationMillis = 150, easing = easing)) +
-                        shrinkVertically(animationSpec = tween(durationMillis = 150, easing = easing)),
+                    fadeOut(animationSpec = tween(durationMillis = exitDuration, easing = easing)) +
+                        shrinkVertically(animationSpec = tween(durationMillis = exitDuration, easing = easing)),
             ) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -523,6 +526,7 @@ fun BusServiceRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .padding(12.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(
                     if (isPinned) {
@@ -543,9 +547,9 @@ fun BusServiceRow(
                             onLongClick = onTogglePinService,
                         )
                     } else {
-                        Modifier.clickable(onClick = {})
+                        Modifier
                     },
-                ).padding(12.dp),
+                ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
