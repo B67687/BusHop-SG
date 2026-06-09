@@ -171,6 +171,8 @@ class MainViewModel(
                 }
             } catch (e: SecurityException) {
                 nearbyError = "Location permission denied."
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 nearbyError = "Error: ${e.message}"
             } finally {
@@ -254,6 +256,8 @@ class MainViewModel(
                 } else {
                     _snackbarMessage.tryEmit("Download failed")
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _snackbarMessage.tryEmit("Install failed: ${e.message}")
             } finally {
