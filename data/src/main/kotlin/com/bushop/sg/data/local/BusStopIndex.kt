@@ -213,10 +213,16 @@ class BusStopIndex(
                     Log.w("BusStopIndex", "Failed to load bus_stops.json", e)
                     "{}"
                 }
-            val type = object : TypeToken<Map<String, List<Any>>>() {}.type
             val raw: Map<String, List<Any>> =
                 try {
-                    gson.fromJson(json, type) ?: emptyMap()
+                    val mapType =
+                        TypeToken
+                            .getParameterized(
+                                Map::class.java,
+                                String::class.java,
+                                TypeToken.getParameterized(List::class.java, Any::class.java).type,
+                            ).type
+                    gson.fromJson(json, mapType) ?: emptyMap()
                 } catch (e: Exception) {
                     Log.w("BusStopIndex", "Failed to parse bus_stops.json", e)
                     emptyMap()
