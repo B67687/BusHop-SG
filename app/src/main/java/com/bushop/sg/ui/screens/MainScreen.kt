@@ -197,7 +197,6 @@ fun MainScreen(viewModel: MainViewModel) {
     var deleteZoneTopPx by remember { mutableStateOf(Float.POSITIVE_INFINITY) }
     val density = LocalDensity.current
     val dragItemHeightPx = with(density) { 140.dp.toPx() }
-    val deleteZoneThresholdPx = with(density) { 60.dp.toPx() }
 
     // Scroll to top when a new stop is pinned
     var prevPinnedCount by remember { mutableStateOf(0) }
@@ -412,20 +411,14 @@ fun MainScreen(viewModel: MainViewModel) {
                                         },
                                         onDragProgress = { code, lastTotalY, draggedCenterY ->
                                             if (draggedCode == code) {
-                                                // Delete zone detection
-                                                val hasMeasuredDeleteZone = deleteZoneTopPx.isFinite()
-                                                isDragOverDeleteZone =
-                                                    if (hasMeasuredDeleteZone) {
-                                                        draggedCenterY >= deleteZoneTopPx
-                                                    } else {
-                                                        lastTotalY > (savedStops.size * dragItemHeightPx) + deleteZoneThresholdPx
-                                                    }
+                                                // Delete zone detection (uses same card-center-in-zone check as deletion)
+                                                if (deleteZoneTopPx.isFinite()) {
+                                                    isDragOverDeleteZone = draggedCenterY >= deleteZoneTopPx
+                                                }
                                             }
                                         },
                                         onDragEnd = { code, lastTotalY ->
-                                            val deleteThreshold = (savedStops.size * dragItemHeightPx) + deleteZoneThresholdPx
-                                            val shouldDelete = isDragOverDeleteZone || lastTotalY > deleteThreshold
-                                            if (shouldDelete) {
+                                            if (isDragOverDeleteZone) {
                                                 viewModel.removeBusStop(code)
                                             } else if (lastTotalY != 0f) {
                                                 val delta = (lastTotalY / dragItemHeightPx).toInt()
