@@ -24,12 +24,65 @@ data class BusStopEntry(
  * In-memory index of all Singapore bus stops.
  *
  * Search uses a 3-stage filter cascade for maximum speed:
- *   Stage 1 — Inverted index (name + road tokens) → O(1) candidate lookup
+ *   Stage 1 — Inverted index + Trie (name + road tokens) → O(1) exact lookup + O(k) prefix lookup
  *   Stage 2 — Length filter + character-frequency pre-check → cheap skip before Levenshtein
  *   Stage 3 — Full token matching with typo-tolerant Levenshtein
  *
  * Abbreviations expanded: bt→bukit, blk→block, int→interchange, amk→ang mo kio, cck→choa chu kang, etc.
  */
+
+/** Trie for O(prefix_length) prefix matching of indexed tokens. */
+private class TokenTrie {
+    private class Node {
+        val children = mutableMapOf<Char, Node>()
+        var indices: List<Int>? = null
+    }
+
+    private val root = Node()
+
+    fun insert(
+        token: String,
+        index: Int,
+    ) {
+        var node = root
+        for (c in token) {
+            node = node.children.getOrPut(c) { Node() }
+        }
+        node.indices = (node.indices ?: emptyList()) + index
+    }
+
+    /** All indices whose token starts with [prefix]. */
+    fun findByPrefix(prefix: String): List<Int> {
+        var node = root
+        for (c in prefix) {
+            node = node.children[c] ?: return emptyList()
+        }
+        return collectIndices(node)
+    }
+
+    /** All indices for tokens that are prefixes of [query] (reverse prefix). */
+    fun findPrefixesOf(query: String): List<Int> {
+        val result = mutableListOf<Int>()
+        var node = root
+        for (c in query) {
+            node = node.children[c] ?: break
+            node.indices?.let { result.addAll(it) }
+        }
+        return result
+    }
+
+    private fun collectIndices(node: Node): List<Int> {
+        val result = mutableListOf<Int>()
+        val stack = ArrayDeque<Node>().apply { add(node) }
+        while (stack.isNotEmpty()) {
+            val n = stack.removeLast()
+            n.indices?.let { result.addAll(it) }
+            stack.addAll(n.children.values)
+        }
+        return result
+    }
+}
+
 class BusStopIndex(
     private val context: Context,
 ) {
@@ -89,6 +142,14 @@ class BusStopIndex(
     @Volatile
     private var roadTokenIndex: Map<String, List<Int>> = emptyMap()
 
+    /** Trie for O(k) prefix matching on name tokens. */
+    @Volatile
+    private var nameTrie: TokenTrie = TokenTrie()
+
+    /** Trie for O(k) prefix matching on road tokens. */
+    @Volatile
+    private var roadTrie: TokenTrie = TokenTrie()
+
     private val _isReady = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
 
@@ -97,6 +158,8 @@ class BusStopIndex(
         indexedStops = testStops.map { it.toIndexed() }
         nameTokenIndex = buildTokenIndex { it.nameTokens }
         roadTokenIndex = buildTokenIndex { it.roadTokens }
+        nameTrie = buildTrie { it.nameTokens }
+        roadTrie = buildTrie { it.roadTokens }
         _isReady.value = true
     }
 
@@ -125,6 +188,17 @@ class BusStopIndex(
             }
         }
         return map
+    }
+
+    /** Build a Trie for O(k) prefix matching from the same data as the inverted index. */
+    private fun buildTrie(tokenSelector: (IndexedStop) -> List<String>): TokenTrie {
+        val trie = TokenTrie()
+        for ((i, idx) in indexedStops.withIndex()) {
+            for (t in tokenSelector(idx)) {
+                if (t.length >= 2) trie.insert(t, i)
+            }
+        }
+        return trie
     }
 
     suspend fun load() {
@@ -161,6 +235,8 @@ class BusStopIndex(
             indexedStops = parsed.map { it.toIndexed() }
             nameTokenIndex = buildTokenIndex { it.nameTokens }
             roadTokenIndex = buildTokenIndex { it.roadTokens }
+            nameTrie = buildTrie { it.nameTokens }
+            roadTrie = buildTrie { it.roadTokens }
         }
         _isReady.value = true
     }
@@ -288,31 +364,22 @@ class BusStopIndex(
             addFromIndex(roadTokenIndex, qt.expanded)
         }
 
-        // Prefix matches on name tokens
-        addPrefixMatches(nameTokenIndex, qt, set)
-        // Prefix matches on road tokens
-        addPrefixMatches(roadTokenIndex, qt, set)
+        // Prefix matches via Trie (O(k) per query instead of O(N) over all tokens)
+        set.addAll(nameTrie.findByPrefix(qt.raw))
+        set.addAll(roadTrie.findByPrefix(qt.raw))
+        if (qt.expanded != qt.raw) {
+            set.addAll(nameTrie.findByPrefix(qt.expanded))
+            set.addAll(roadTrie.findByPrefix(qt.expanded))
+        }
+        // Also match tokens that are prefixes of the query (e.g., query "jurong" matches token "jur")
+        set.addAll(nameTrie.findPrefixesOf(qt.raw))
+        set.addAll(roadTrie.findPrefixesOf(qt.raw))
+        if (qt.expanded != qt.raw) {
+            set.addAll(nameTrie.findPrefixesOf(qt.expanded))
+            set.addAll(roadTrie.findPrefixesOf(qt.expanded))
+        }
 
         return set
-    }
-
-    /** Add all indices from [index] whose token has a prefix match with [qt]. */
-    private fun addPrefixMatches(
-        index: Map<String, List<Int>>,
-        qt: QueryToken,
-        target: MutableSet<Int>,
-    ) {
-        for ((token, indices) in index) {
-            if (token.length < 2) continue
-            if (token != qt.raw && token != qt.expanded &&
-                (
-                    token.startsWith(qt.raw) || (qt.raw.startsWith(token) && token.length >= 2) ||
-                        token.startsWith(qt.expanded) || (qt.expanded.startsWith(token) && token.length >= 2)
-                )
-            ) {
-                target.addAll(indices)
-            }
-        }
     }
 
     private fun qtInName(
