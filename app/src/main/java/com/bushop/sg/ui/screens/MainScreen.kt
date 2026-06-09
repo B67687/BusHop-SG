@@ -389,13 +389,14 @@ fun MainScreen(viewModel: MainViewModel) {
                                 ) { stopWithArrivals ->
                                     BusStopCard(
                                         modifier =
-                                            if (draggedCode != stopWithArrivals.busStop.code) {
-                                                Modifier.animateItem(
-                                                    placementSpec = tween(durationMillis = 200),
-                                                )
-                                            } else {
-                                                Modifier
-                                            },
+                                            Modifier.animateItem(
+                                                placementSpec =
+                                                    if (draggedCode == stopWithArrivals.busStop.code) {
+                                                        tween(durationMillis = 0)
+                                                    } else {
+                                                        tween(durationMillis = 200)
+                                                    },
+                                            ),
                                         stop = stopWithArrivals,
                                         onRefresh = { viewModel.refreshArrivals(stopWithArrivals.busStop.code) },
                                         onToggleCollapse = { viewModel.toggleCollapse(stopWithArrivals.busStop.code) },

@@ -111,7 +111,8 @@ fun BusStopCard(
     var localDragOffset by remember { mutableStateOf(0f) }
     var isLocallyDragged by remember { mutableStateOf(false) }
     var collapsedForDrag by remember { mutableStateOf(false) }
-    var cardCenterYInRoot by remember { mutableStateOf(0f) }
+    var cardTopYInRoot by remember { mutableStateOf(0f) }
+    var cardHeightInRoot by remember { mutableStateOf(0f) }
     val visuallyDragged = isLocallyDragged
     val currentAnchor = dragOffsetAnchorRef?.get() ?: 0f
     val effectiveOffset = localDragOffset - currentAnchor
@@ -127,7 +128,8 @@ fun BusStopCard(
             modifier
                 .fillMaxWidth()
                 .onGloballyPositioned { coordinates ->
-                    cardCenterYInRoot = coordinates.positionInRoot().y + (coordinates.size.height / 2f)
+                    cardTopYInRoot = coordinates.positionInRoot().y
+                    cardHeightInRoot = coordinates.size.height.toFloat()
                 }.then(
                     if (visuallyDragged) {
                         Modifier
@@ -191,16 +193,22 @@ fun BusStopCard(
                                                 change.consume()
                                                 totalY += dragAmount.y
                                                 localDragOffset = totalY
+                                                // Use collapsed card center for delete zone detection
+                                                val cardCenter = cardTopYInRoot + (cardHeightInRoot / 2f)
                                                 onDragProgress?.invoke(
                                                     busStopCode,
                                                     totalY,
-                                                    cardCenterYInRoot + totalY,
+                                                    cardCenter + totalY,
                                                 )
                                             },
                                             onDragEnd = {
                                                 onDragEnd?.invoke(busStopCode, totalY)
                                                 isLocallyDragged = false
                                                 localDragOffset = 0f
+                                                // Keep collapsed state after drag (toggle permanently if was expanded)
+                                                if (!isCollapsed && collapsedForDrag) {
+                                                    onToggleCollapse()
+                                                }
                                                 collapsedForDrag = false
                                             },
                                             onDragCancel = {
