@@ -172,13 +172,14 @@ fun BusStopCard(
         border = if (isPinned) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         elevation = CardDefaults.cardElevation(defaultElevation = if (visuallyDragged) 12.dp else 3.dp),
     ) {
+        val pulseOverlayColor = MaterialTheme.colorScheme.primary
         Column(
             modifier =
                 Modifier.drawWithContent {
                     drawContent()
                     if (pulseAlpha > 0.001f) {
                         drawRect(
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha * 0.2f),
+                            color = pulseOverlayColor.copy(alpha = pulseAlpha * 0.2f),
                             size = size,
                         )
                     }
