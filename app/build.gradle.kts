@@ -82,10 +82,11 @@ tasks.register("checkAndRenameDebugApk") {
 
         val totalBytes = apk.length()
 
-        // Verify APK has an AndroidManifest.xml using Gradle's zipTree
-        val apkTree = project.zipTree(apk)
-        val hasManifest = apkTree.matching { include("AndroidManifest.xml") }.files.isNotEmpty()
-        val fileCount = apkTree.files.size
+        // Verify APK has an AndroidManifest.xml using standard ZipFile (config-cache compatible)
+        val (hasManifest, fileCount) =
+            java.util.zip.ZipFile(apk).use { zip ->
+                zip.getEntry("AndroidManifest.xml") != null to zip.size()
+            }
 
         if (!hasManifest) {
             throw GradleException(
