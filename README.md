@@ -52,7 +52,7 @@ Or [build from source](#build-from-source) for a debug APK.
 
 ## Architecture
 
-<img src="docs/architecture.svg" alt="Architecture diagram" width="600">
+<img src="docs/architecture.svg" alt="Architecture diagram" width="800">
 
 - **domain/** — Pure Kotlin (zero framework deps). Models, use cases, repository interfaces.
 - **data/** — Android library. Retrofit API calls, DataStore persistence, BusStopIndex with TokenTrie for search.
