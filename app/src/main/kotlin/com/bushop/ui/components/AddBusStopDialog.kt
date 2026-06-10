@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
@@ -74,6 +75,14 @@ fun AddBusStopDialog(
     // Show nearby results when available
     val activeResults = if (nearbyStops.isNotEmpty() && searchQuery.length < 1) nearbyStops else searchResults
     val showNearbyHeader = nearbyStops.isNotEmpty() && searchQuery.length < 1
+    val resultsListState = rememberLazyListState()
+
+    // Scroll to top when results change (new search query)
+    LaunchedEffect(activeResults) {
+        if (activeResults.isNotEmpty()) {
+            resultsListState.animateScrollToItem(0)
+        }
+    }
 
     Dialog(
         onDismissRequest = {
@@ -176,7 +185,11 @@ fun AddBusStopDialog(
                             )
                             Spacer(Modifier.height(4.dp))
                         }
-                        LazyColumn(modifier = Modifier.fillMaxWidth().height(260.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        LazyColumn(
+                            state = resultsListState,
+                            modifier = Modifier.fillMaxWidth().height(260.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
                             items(activeResults, key = { it.code }) { entry ->
                                 Row(
                                     modifier =
