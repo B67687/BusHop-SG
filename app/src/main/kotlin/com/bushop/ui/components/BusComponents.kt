@@ -241,6 +241,7 @@ fun BusStopCard(
                         Box(
                             modifier =
                                 Modifier
+                                    .widthIn(max = 130.dp)
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(namePillBg)
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
