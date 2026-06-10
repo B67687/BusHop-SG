@@ -147,10 +147,10 @@ class ArchitectureTest {
                     val packagePart = outerClass.replace('.', '/')
                     val domainDir = File(projectRoot, "domain/src/main/kotlin/$packagePart")
                     val dataDir = File(projectRoot, "data/src/main/kotlin/$packagePart")
-                    val appDir = File(projectRoot, "app/src/main/java/$packagePart")
+                    val appDir = File(projectRoot, "app/src/main/kotlin/$packagePart")
                     val domainFile = File(projectRoot, "domain/src/main/kotlin/$packagePart.kt")
                     val dataFile = File(projectRoot, "data/src/main/kotlin/$packagePart.kt")
-                    val appFile = File(projectRoot, "app/src/main/java/$packagePart.kt")
+                    val appFile = File(projectRoot, "app/src/main/kotlin/$packagePart.kt")
                     if (!domainDir.exists() && !dataDir.exists() && !appDir.exists() &&
                         !domainFile.exists() && !dataFile.exists() && !appFile.exists()
                     ) {
