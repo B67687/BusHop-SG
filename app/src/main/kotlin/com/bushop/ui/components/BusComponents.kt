@@ -148,7 +148,7 @@ fun BusStopCard(
                     if (isPinned) {
                         MaterialTheme.colorScheme.primaryContainer
                     } else {
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                        MaterialTheme.colorScheme.surfaceVariant
                     },
             ),
         border = if (isPinned) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
