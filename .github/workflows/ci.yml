@@ -22,12 +22,13 @@ jobs:
               with:
                   distribution: "temurin"
                   java-version: 17
-            - name: Cache Gradle
+            - name: Cache Gradle dependencies
               uses: actions/cache@v4
               with:
                   path: ~/.gradle/caches/
-                  key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/*.kts', '**/*.toml', '**/gradle-wrapper.properties') }}
-                  restore-keys: gradle-${{ runner.os }}-
+                  key: deps-${{ runner.os }}-${{ hashFiles('**/libs.versions.toml') }}
+                  restore-keys: |
+                      deps-${{ runner.os }}-
             - name: Grant execute permission for gradlew
               run: chmod +x gradlew
             - name: Verify version matches tag
@@ -54,12 +55,13 @@ jobs:
               with:
                   distribution: "temurin"
                   java-version: 17
-            - name: Cache Gradle
+            - name: Cache Gradle dependencies
               uses: actions/cache@v4
               with:
                   path: ~/.gradle/caches/
-                  key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/*.kts', '**/*.toml', '**/gradle-wrapper.properties') }}
-                  restore-keys: gradle-${{ runner.os }}-
+                  key: deps-${{ runner.os }}-${{ hashFiles('**/libs.versions.toml') }}
+                  restore-keys: |
+                      deps-${{ runner.os }}-
             - name: Grant execute permission for gradlew
               run: chmod +x gradlew
             - name: Run tests & build debug APK
