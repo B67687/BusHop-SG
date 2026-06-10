@@ -632,6 +632,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                 viewModel.addBusStop(code, resolvedName)
             },
+            randomHint = viewModel.randomHint,
         )
     }
 
