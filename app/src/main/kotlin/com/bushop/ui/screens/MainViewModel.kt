@@ -255,6 +255,7 @@ class MainViewModel(
                                 android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                         }
                     getApplication<android.app.Application>().startActivity(intent)
+                    targetFile.delete()
                     _snackbarMessage.tryEmit("Installing v${info.latestVersion}…")
                 } else {
                     _snackbarMessage.tryEmit("Download failed")

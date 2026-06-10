@@ -61,6 +61,12 @@ class UpdateChecker {
     ): Boolean =
         withContext(Dispatchers.IO) {
             try {
+                // Validate the download URL is from GitHub to prevent MITM redirect attacks
+                if (!url.startsWith("https://") ||
+                    (!url.contains("github.com") && !url.contains("github-releases.githubusercontent.com"))
+                ) {
+                    return@withContext false
+                }
                 val request = Request.Builder().url(url).build()
                 val response = client.newCall(request).execute()
                 val body = response.body ?: return@withContext false
