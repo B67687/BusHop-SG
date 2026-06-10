@@ -144,12 +144,7 @@ fun BusStopCard(
         shape = RoundedCornerShape(20.dp),
         colors =
             CardDefaults.cardColors(
-                containerColor =
-                    if (isPinned) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surface
-                    },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
             ),
         border = if (isPinned) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         elevation = CardDefaults.cardElevation(defaultElevation = if (visuallyDragged) 12.dp else 3.dp),

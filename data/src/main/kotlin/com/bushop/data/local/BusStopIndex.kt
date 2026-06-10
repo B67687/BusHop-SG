@@ -477,6 +477,8 @@ class BusStopIndex(
 
     fun findByCode(code: String): BusStopEntry? = stops[code]
 
+    fun allEntries(): List<BusStopEntry> = stops.values.toList()
+
     private fun haversineKm(
         lat1: Double,
         lng1: Double,

@@ -68,6 +68,9 @@ class MainViewModel(
     var addStopDialogVisible by mutableStateOf(false)
         private set
 
+    var randomHint by mutableStateOf("83139 (Jurong East Int)")
+        private set
+
     var addStopError by mutableStateOf<String?>(null)
         private set
 
@@ -349,6 +352,12 @@ class MainViewModel(
     fun showAddStopDialog() {
         addStopError = null
         addStopDialogVisible = true
+        // Pick a random stop from the index for the placeholder hint
+        val entries = busStopIndex.allEntries()
+        if (entries.isNotEmpty()) {
+            val entry = entries.random()
+            randomHint = "${entry.code} (${entry.name})"
+        }
     }
 
     fun searchBusStops(query: String) {
