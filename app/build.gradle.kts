@@ -67,6 +67,7 @@ android {
 
 /** Locate the debug APK, verify it has an AndroidManifest, then rename predictably. */
 tasks.register("checkAndRenameDebugApk") {
+    notCompatibleWithConfigurationCache()
     dependsOn("assembleDebug")
     doLast {
         val apkDir =
