@@ -17,6 +17,16 @@ jobs:
                   distribution: "temurin"
                   java-version: 17
 
+            - name: Cache Gradle
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.gradle/caches/
+                      ~/.gradle/wrapper/
+                  key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/libs.versions.toml') }}
+                  restore-keys: |
+                      gradle-${{ runner.os }}-
+
             - name: Grant execute permission for gradlew
               run: chmod +x gradlew
 
@@ -33,11 +43,5 @@ jobs:
                     echo "✅ Version $VERSION matches tag $TAG"
                   fi
 
-            - name: Run lint
-              run: ./gradlew lint
-
-            - name: Run all tests
-              run: ./gradlew test
-
-            - name: Build & verify debug APK
-              run: ./gradlew checkAndRenameDebugApk
+            - name: Lint, test & build APK (single invocation saves ~30s JVM startup)
+              run: ./gradlew lint testDebugUnitTest checkAndRenameDebugApk
