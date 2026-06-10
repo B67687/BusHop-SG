@@ -30,7 +30,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DialogProperties
 import androidx.compose.ui.unit.dp
 import com.bushop.data.local.BusStopEntry
 
@@ -73,6 +75,13 @@ fun AddBusStopDialog(
             }
             onDismiss()
         },
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = true,
+                scrimColor = Color.Black.copy(alpha = 0.20f),
+            ),
         title = {
             Text(if (confirmNearby != null) "Confirm Add" else "Add Bus Stop")
         },
