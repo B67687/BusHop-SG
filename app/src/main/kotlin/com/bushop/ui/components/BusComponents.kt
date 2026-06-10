@@ -146,7 +146,7 @@ fun BusStopCard(
             CardDefaults.cardColors(
                 containerColor =
                     if (isPinned) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                        MaterialTheme.colorScheme.primaryContainer
                     } else {
                         MaterialTheme.colorScheme.surface
                     },
