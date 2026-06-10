@@ -352,12 +352,26 @@ class MainViewModel(
     fun showAddStopDialog() {
         addStopError = null
         addStopDialogVisible = true
-        // Pick a random stop from the index for the placeholder hint
-        val entries = busStopIndex.allEntries()
-        if (entries.isNotEmpty()) {
-            val entry = entries.random()
-            randomHint = "${entry.code} (${entry.name})"
+        // Pick a random stop from the index (if loaded) or fallback from static list
+        if (busStopIndex.isReady.value) {
+            val entries = busStopIndex.allEntries()
+            if (entries.isNotEmpty()) {
+                randomHint = with(entries.random()) { "$code ($name)" }
+                return
+            }
         }
+        randomHint =
+            listOf(
+                "66666 (Sengkang Int)",
+                "11111 (Orchard Stn)",
+                "44444 (Boon Lay Int)",
+                "22345 (Bt Batok Int)",
+                "99012 (Blk 789)",
+                "55678 (Tampines Int)",
+                "33333 (Choa Chu Kang Int)",
+                "22222 (HarbourFront Int)",
+                "55555 (Punggol Temp Int)",
+            ).random()
     }
 
     fun searchBusStops(query: String) {
