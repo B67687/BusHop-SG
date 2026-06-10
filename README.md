@@ -147,3 +147,4 @@ BusHop uses the [Arrivelah](https://github.com/cheeaun/arrivelah) API (`arrivela
 ## License
 
 MIT License — see [LICENSE](LICENSE).
+
